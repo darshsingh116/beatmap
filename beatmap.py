@@ -1,3 +1,6 @@
+import math
+from typing import List, Tuple
+
 class OsuBeatmap:
     def __init__(self, audio, split, folder, beatmapset_id, beatmap_id, approved, total_length, hit_length, version,
                  file_md5, diff_size, diff_overall, diff_approach, diff_drain, mode, count_normal, count_slider,
@@ -115,3 +118,85 @@ def parse_osu_file(file_path):
         diff_speed=float(data.get('DifficultySpeed', 0)),
         difficultyrating=float(data.get('DifficultyRating', 0))
     )
+
+
+
+
+# Function to interpolate linear points
+def interpolate_linear(start, end, t):
+    return start + t * (end - start)
+
+# Function to calculate a point on a quadratic Bezier curve
+def bezier_point(t, points):
+    n = len(points) - 1
+    x = sum(math.comb(n, i) * (1 - t)**(n - i) * t**i * points[i][0] for i in range(n + 1))
+    y = sum(math.comb(n, i) * (1 - t)**(n - i) * t**i * points[i][1] for i in range(n + 1))
+    return x, y
+
+# Function to calculate a point on a perfect circle (P slider type)
+def circle_point(center, radius, angle):
+    return (
+        center[0] + radius * math.cos(angle),
+        center[1] + radius * math.sin(angle)
+    )
+
+# Function to split slider into segments
+def split_slider(slider_data: str):
+    # Parse slider_data
+    parts = slider_data.split(',')
+    start_point = tuple(map(int, parts[:2]))
+    slider_type = parts[5][0]
+    path_data = parts[5][2:]
+    slider_points = parts[8].split('|')
+    slider_points_data = parts[9].split('|')
+    num_points = len(slider_points)
+
+    # Calculate path points
+    path_points = [start_point] + [tuple(map(int, p.split(':'))) for p in path_data.split('|')]
+
+    # Initialize new segments list
+    new_segments = []
+    
+    # Generate new segments based on slider type
+    if slider_type == 'L':
+        # Linear interpolation
+        for i in range(num_points):
+            t = i / (num_points - 1)
+            new_x = interpolate_linear(start_point[0], path_points[-1][0], t)
+            new_y = interpolate_linear(start_point[1], path_points[-1][1], t)
+            segment = f"{int(new_x)},{int(new_y)},{int(parts[2])},{parts[3]},{int(parts[4])},L|{int(new_x)}:{int(new_y)},{int(parts[6])},{slider_points[i]},{slider_points_data[i]},{parts[-1]},{0 if i == 0 else 2 if i == num_points - 1 else 1}"
+            new_segments.append(segment)
+
+    elif slider_type == 'B':
+        # Bezier curve interpolation
+        for i in range(num_points):
+            t = i / (num_points - 1)
+            new_x, new_y = bezier_point(t, path_points)
+            segment = f"{int(new_x)},{int(new_y)},{int(parts[2])},{parts[3]},{int(parts[4])},B|{int(new_x)}:{int(new_y)},{int(parts[6])},{slider_points[i]},{slider_points_data[i]},{parts[-1]},{0 if i == 0 else 2 if i == num_points - 1 else 1}"
+            new_segments.append(segment)
+
+    elif slider_type == 'P':
+        # Perfect circle interpolation
+        # Extract center and radius
+        center = path_points[0]
+        radius = math.sqrt((path_points[1][0] - center[0])**2 + (path_points[1][1] - center[1])**2)
+        total_points = num_points
+        angle_increment = 2 * math.pi / total_points
+        
+        for i in range(num_points):
+            angle = i * angle_increment
+            new_x, new_y = circle_point(center, radius, angle)
+            new_time = int(parts[2])  # This should be adjusted based on actual time increments
+            segment = f"{int(new_x)},{int(new_y)},{new_time},{parts[3]},{int(parts[4])},P|{int(new_x)}:{int(new_y)},{int(parts[6])},{slider_points[i]},{slider_points_data[i]},{parts[-1]},{0 if i == 0 else 2 if i == num_points - 1 else 1}"
+            new_segments.append(segment)
+
+    return new_segments
+
+# # Example slider data and split operation
+# slider_data = "431,86,96039,6,0,P|406:144|433:238,1,157.500006008148,0|0,1:0|0:0,0:0:0:0:"
+
+# # Split the slider into segments
+# new_slider_segments = split_slider(slider_data)
+# # Output the new segments
+# for segment in new_slider_segments:
+#     print(segment)
