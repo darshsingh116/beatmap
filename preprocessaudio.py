@@ -26,6 +26,8 @@ def preprocess_and_save_audio(df):
 
         # Extract MFCC features
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        # mfcc = np.array(mfcc)
+        # mfcc = np.transpose(mfcc)
         
         # Construct the save path
         save_path = os.path.join(processed_dir, f"{row['audio']}.npy")

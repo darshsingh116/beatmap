@@ -1,13 +1,11 @@
-import math
-from typing import List, Tuple
-
 class OsuBeatmap:
-    def __init__(self, audio, split, folder, beatmapset_id, beatmap_id, approved, total_length, hit_length, version,
+    def __init__(self,hit_objects ,audio, split, folder, beatmapset_id, beatmap_id, approved, total_length, hit_length, version,
                  file_md5, diff_size, diff_overall, diff_approach, diff_drain, mode, count_normal, count_slider,
                  count_spinner, submit_date, approved_date, last_update, artist, artist_unicode, title, title_unicode,
                  creator, creator_id, bpm, source, tags, genre_id, language_id, favourite_count, rating, storyboard,
                  video, download_unavailable, audio_unavailable, playcount, passcount, packs, max_combo, diff_aim,
                  diff_speed, difficultyrating):
+        self.hit_objects = hit_objects
         self.audio = audio
         self.split = split
         self.folder = folder
@@ -57,21 +55,65 @@ class OsuBeatmap:
     def __repr__(self):
         return f"OsuBeatmap({self.title} - {self.artist})"
 
+import math
+from typing import List, Tuple
+
+    
+def process_hitobject(hitobject: str) -> List[str]:
+    parts = hitobject.split(',')
+    hit_type = int(parts[3])
+    
+    if hit_type in {1, 5}:
+        # Handle hit objects of type 1 or 4
+        if len(parts)==5:
+            parts.append("0:0:0:0:")
+        subpart = parts[5].split(":")
+        subpart.pop()
+        subpart = [int(i) for i in subpart]
+        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [-1] * 10 + subpart + [-1]
+        return [parts + ['-1'] * (11 - len(parts))]  # Length 11
+    
+    elif hit_type in {2, 6}:
+        # Handle hit objects of type 2 or 6 (slider)
+        # slider_data = parts[5]
+        
+        return split_slider(hitobject)
+    
+    elif hit_type in {8, 12}:
+        # Handle hit objects of type 8 or 12
+        if len(parts)==6:
+            parts.append("0:0:0:0:")
+        return [[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5]) ]+ [-1] * 9 +[0,0,0,0,-1]]  # Pad to length 11
+    
+    else:
+        return [parts]  # Return as-is if no special handling    
+
 
 
 def parse_osu_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         data = {}
+        hit_objects = []
+        current_section = None
+        
         for line in file:
+            line = line.strip()
             if line.startswith('['):
-                # Skip section headers like [General], [Metadata], etc.
+                # Handle section headers
+                current_section = line[1:-1]
                 continue
+            
+            if current_section == 'HitObjects' and line:
+                for l in process_hitobject(line):
+                    hit_objects.append(l)
+                continue
+            
             if ':' in line:
                 key, value = line.split(':', 1)
                 data[key.strip()] = value.strip()
-
     # Create an instance of OsuBeatmap using the parsed data
     return OsuBeatmap(
+        hit_objects=hit_objects,
         audio=data.get('AudioFilename', ''),
         split='',  # Handle this if necessary
         folder='',  # Handle this if necessary
@@ -142,11 +184,28 @@ def circle_point(center, radius, angle):
 
 # Function to split slider into segments
 def split_slider(slider_data: str):
+    print(slider_data)
     # Parse slider_data
     parts = slider_data.split(',')
+    sliderdatalen = len(parts)
+    # if(sliderdatalen<11):
+    #         print(slider_data)
+
+    if sliderdatalen<9:
+        parts.append("0|0")
+    if sliderdatalen<10:
+        parts.append("0:0|0:0")
+    if sliderdatalen<11:
+        parts.append("0:0:0:0:")
+
+    # if sliderdatalen<11:
+    #     print(parts)
+
     start_point = tuple(map(int, parts[:2]))
     slider_type = parts[5][0]
     path_data = parts[5][2:]
+
+    
     slider_points = parts[8].split('|')
     slider_points_data = parts[9].split('|')
     num_points = len(slider_points)
@@ -164,7 +223,12 @@ def split_slider(slider_data: str):
             t = i / (num_points - 1)
             new_x = interpolate_linear(start_point[0], path_points[-1][0], t)
             new_y = interpolate_linear(start_point[1], path_points[-1][1], t)
-            segment = f"{int(new_x)},{int(new_y)},{int(parts[2])},{parts[3]},{int(parts[4])},L|{int(new_x)}:{int(new_y)},{int(parts[6])},{slider_points[i]},{slider_points_data[i]},{parts[-1]},{0 if i == 0 else 2 if i == num_points - 1 else 1}"
+            subpart = parts[-1].split(":")
+            subpart.pop()
+            subpart = [int(i) for i in subpart]
+            # slider_point_toint_data = slider_points_data[i].split(':')
+            slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')] #+[int(i) for i in slider_points_data[i+1].split(':')]
+            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
     elif slider_type == 'B':
@@ -172,7 +236,12 @@ def split_slider(slider_data: str):
         for i in range(num_points):
             t = i / (num_points - 1)
             new_x, new_y = bezier_point(t, path_points)
-            segment = f"{int(new_x)},{int(new_y)},{int(parts[2])},{parts[3]},{int(parts[4])},B|{int(new_x)}:{int(new_y)},{int(parts[6])},{slider_points[i]},{slider_points_data[i]},{parts[-1]},{0 if i == 0 else 2 if i == num_points - 1 else 1}"
+            subpart = parts[-1].split(":")
+            subpart.pop()
+            subpart = [int(i) for i in subpart]
+            # slider_point_toint_data = slider_points_data[i].split(':')
+            slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
+            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
     elif slider_type == 'P':
@@ -186,9 +255,15 @@ def split_slider(slider_data: str):
         for i in range(num_points):
             angle = i * angle_increment
             new_x, new_y = circle_point(center, radius, angle)
-            new_time = int(parts[2])  # This should be adjusted based on actual time increments
-            segment = f"{int(new_x)},{int(new_y)},{new_time},{parts[3]},{int(parts[4])},P|{int(new_x)}:{int(new_y)},{int(parts[6])},{slider_points[i]},{slider_points_data[i]},{parts[-1]},{0 if i == 0 else 2 if i == num_points - 1 else 1}"
+            subpart = parts[-1].split(":")
+            subpart.pop()
+            subpart = [int(i) for i in subpart]
+            # slider_point_toint_data = slider_points_data[i].split(':')
+            slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
+            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
+    
+    print(new_segments)
 
     return new_segments
 
