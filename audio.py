@@ -27,35 +27,60 @@ def load_mfcc_data_from_npy_folder(folder_path):
     return mfcc_data
 
 
+import numpy as np
 
 def create_chunks_from_mfcc(song_mfcc, chunk_size_ms=100, overlap_ms=50, sr=22050):
-    """
-    Create overlapping chunks from MFCC data for a single song.
+    # """
+    # Create overlapping chunks from MFCC data for a single song.
     
-    Parameters:
-    - song_mfcc: numpy array, containing MFCC features for a single song.
-    - chunk_size_ms: int, size of each chunk in milliseconds.
-    - overlap_ms: int, overlap between consecutive chunks in milliseconds.
-    - sr: int, sample rate of the audio (default 22050 Hz).
+    # Parameters:
+    # - song_mfcc: numpy array, containing transposed MFCC features (time steps in rows, coefficients in columns).
+    # - chunk_size_ms: int, size of each chunk in milliseconds.
+    # - overlap_ms: int, overlap between consecutive chunks in milliseconds.
+    # - sr: int, sample rate of the audio (default 22050 Hz).
     
-    Returns:
-    - chunks: numpy array, containing overlapping chunks for the song.
-    """
-    # Calculate the number of rows for the chunk size and overlap
-    rows_per_ms = sr / 1000  # number of samples per millisecond
-    chunk_size = int(chunk_size_ms * rows_per_ms)  # number of samples for the chunk size
-    overlap_size = int(overlap_ms * rows_per_ms)  # number of samples for the overlap
+    # Returns:
+    # - chunks: numpy array, containing overlapping chunks for the song.
+    # """
+
+    '''above explanataion is wrong'''
     
-    num_rows = song_mfcc.shape[1]  # number of time steps
+    # # Calculate the number of rows for the chunk size and overlap
+    # rows_per_ms = sr / 1000  # number of samples per millisecond
+    # chunk_size = int(chunk_size_ms * rows_per_ms)  # number of samples for the chunk size
+    # overlap_size = int(overlap_ms * rows_per_ms)  # number of samples for the overlap
+
+
+
+    # Let's assume the following values:
+
+    # Sampling rate (sr) = 22050 Hz
+    # Frame size (FS) = 2048 samples
+    # Hop length (HL) = 512 samples
+    # Number of MFCC coefficients (n_mfcc) = 13
+    # Frames per second = 22050 / 512 ≈ 43.1
+    # MFCCs per second = 43.1 * 13 ≈ 560.3
+    # MFCCs for 100ms = 560.3 * (100/1000) ≈ 56.03
+    # MFCCs for 50ms = 560.3 * (50/1000) ≈ 28.02
+
+
+    chunk_size = 56.03 #for 100ms
+    overlap_size = 28.02 #for 50ms
+    
+    num_rows = song_mfcc.shape[0]  # number of time steps (since the data is transposed)
+    # print(song_mfcc.shape)
     chunks = []
     
     # Create chunks with the specified size and overlap
-    for start in range(0, num_rows - chunk_size + 1, chunk_size - overlap_size):
+    for start in range(0, num_rows - int(chunk_size) + 1, int(chunk_size - overlap_size)):
         end = start + chunk_size
-        chunk = song_mfcc[:, start:end]
+        chunk = song_mfcc[start:int(end), :]  # Slicing rows for time steps, keeping all columns (coefficients)
         chunks.append(chunk)
     
+    # print("create_chunks_from_mfcc")
+    # print(len(chunks))
     return np.array(chunks)
+
 
 def create_overlapping_chunks(mfcc_data, chunk_size_ms=100, overlap_ms=50, sr=22050):
     """

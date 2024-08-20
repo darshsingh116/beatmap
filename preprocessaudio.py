@@ -19,15 +19,21 @@ def preprocess_and_save_audio(df):
         
         # Load the audio file
         try:
-            y, sr = librosa.load(file_path, sr=None)
+            y, sr = librosa.load(file_path, sr=22050)
+            print(y)
+            print(sr)
         except FileNotFoundError:
             print(f"File {file_path} not found.")
             continue
 
-        # Extract MFCC features
-        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-        # mfcc = np.array(mfcc)
-        # mfcc = np.transpose(mfcc)
+        # Define custom frame size and hop length
+        frame_size = 2048  # Frame size (n_fft)
+        hop_length = 512   # Hop length (number of samples between successive frames)
+
+        # Compute MFCCs with the specified frame size and hop length
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=frame_size, hop_length=hop_length)
+        mfcc = np.array(mfcc)
+        mfcc = np.transpose(mfcc)
         
         # Construct the save path
         save_path = os.path.join(processed_dir, f"{row['audio']}.npy")
