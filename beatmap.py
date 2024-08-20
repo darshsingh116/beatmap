@@ -70,7 +70,7 @@ def process_hitobject(hitobject: str) -> List[str]:
         subpart = parts[5].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [-1] * 10 + subpart + [-1]
+        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]
         return [parts + ['-1'] * (11 - len(parts))]  # Length 11
     
     elif hit_type in {2, 6}:
@@ -184,7 +184,7 @@ def circle_point(center, radius, angle):
 
 # Function to split slider into segments
 def split_slider(slider_data: str):
-    print(slider_data)
+    # print(slider_data)
     # Parse slider_data
     parts = slider_data.split(',')
     sliderdatalen = len(parts)
@@ -247,14 +247,37 @@ def split_slider(slider_data: str):
     elif slider_type == 'P':
         # Perfect circle interpolation
         # Extract center and radius
-        center = path_points[0]
-        radius = math.sqrt((path_points[1][0] - center[0])**2 + (path_points[1][1] - center[1])**2)
-        total_points = num_points
-        angle_increment = 2 * math.pi / total_points
         
+        # center = path_points[0]
+        # radius = math.sqrt((path_points[1][0] - center[0])**2 + (path_points[1][1] - center[1])**2)
+        # total_points = num_points
+        # angle_increment = 2 * math.pi / total_points
+        
+        # for i in range(num_points):
+        #     angle = i * angle_increment
+        #     new_x, new_y = circle_point(center, radius, angle)
+        #     subpart = parts[-1].split(":")
+        #     subpart.pop()
+        #     subpart = [int(i) for i in subpart]
+        #     # slider_point_toint_data = slider_points_data[i].split(':')
+        #     slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
+        #     segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+        #     new_segments.append(segment)
+
+        
+         # Calculate path points
+        path_points = [start_point] + [tuple(map(int, p.split(':'))) for p in path_data.split('|')]
+        if num_points==2 :
+            slider_points = slider_points + ["0"]
+            slider_points_data = slider_points_data + ["0:0"]
+        elif num_points>3:
+            slider_points = slider_points[0:3]
+            slider_points_data = slider_points_data[0:3]
+        # print(slider_points)
+        # print(path_points)
+        num_points = len(slider_points)
         for i in range(num_points):
-            angle = i * angle_increment
-            new_x, new_y = circle_point(center, radius, angle)
+            new_x, new_y = (path_points[i][0],path_points[i][1])
             subpart = parts[-1].split(":")
             subpart.pop()
             subpart = [int(i) for i in subpart]
@@ -262,8 +285,12 @@ def split_slider(slider_data: str):
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
             segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
+
+
+        # print(slider_data)
+        # print(new_segments)
     
-    print(new_segments)
+    # print(new_segments)
 
     return new_segments
 

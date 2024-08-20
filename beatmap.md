@@ -78,19 +78,22 @@ parsed_hit_circle = ['256', '192', '2500', '1', '0', '0:0:0:0:', '-1', '-1', '-1
 
 # Structured Data:
 # The data is normalized and padded to fit the neural network's input format.
-structured_hit_circle = [256, 192, 2500, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, -1]
+structured_hit_circle = [256, 192, 2500, 1, 0, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, -1]
+#make all the -1 to 0
+structured_hit_circle = [256, 192, 2500, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 
 #### 2. Slider Structuring
 - Assign B,L,P,O etc numbers 1,2,3,4,etc
+- Discarding Pixel Length.
 
 ```python
 # Parsed Data from Phase 1:
-parsed_slider_segment = ['431', '86', '96039', '2', '0', 'B|419:115', '157', '0|0', '1:0|0:0', '0:0:0:0:', '0']
+parsed_slider_segment = ['431', '86', '96039', '2', '0', 'B|419:115','0', '157', '0|0', '1:0|0:0', '0:0:0:0:', '0']
 
 # Structured Data:
 # Similar to the hit circle, but includes additional fields for slider data.
-structured_slider_segment = [431, 86, 96039, 2, 0, 1, 419, 115, 157, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+structured_slider_segment = [431, 86, 96039, 2, 0, 1, 419, 115, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 #### 3. Spinner Structuring
 
