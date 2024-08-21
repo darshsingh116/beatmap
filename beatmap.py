@@ -70,7 +70,7 @@ def process_hitobject(hitobject: str) -> List[str]:
         subpart = parts[5].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]
+        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 7 + subpart + [0]
         return [parts + ['-1'] * (11 - len(parts))]  # Length 11
     
     elif hit_type in {2, 6}:
@@ -83,7 +83,7 @@ def process_hitobject(hitobject: str) -> List[str]:
         # Handle hit objects of type 8 or 12
         if len(parts)==6:
             parts.append("0:0:0:0:")
-        return [[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5]) ]+ [-1] * 9 +[0,0,0,0,-1]]  # Pad to length 11
+        return [[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5]) ]+ [0] * 7 +[0,0,0,0,0]]  # Pad to length 11
     
     else:
         return [parts]  # Return as-is if no special handling    
@@ -228,7 +228,7 @@ def split_slider(slider_data: str):
             subpart = [int(i) for i in subpart]
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')] #+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
     elif slider_type == 'B':
@@ -241,7 +241,7 @@ def split_slider(slider_data: str):
             subpart = [int(i) for i in subpart]
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
     elif slider_type == 'P':
@@ -283,7 +283,7 @@ def split_slider(slider_data: str):
             subpart = [int(i) for i in subpart]
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
 
