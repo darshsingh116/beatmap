@@ -1,11 +1,12 @@
 class OsuBeatmap:
-    def __init__(self,hit_objects ,audio, split, folder, beatmapset_id, beatmap_id, approved, total_length, hit_length, version,
+    def __init__(self,hit_objects, timing_points  ,audio, split, folder, beatmapset_id, beatmap_id, approved, total_length, hit_length, version,
                  file_md5, diff_size, diff_overall, diff_approach, diff_drain, mode, count_normal, count_slider,
                  count_spinner, submit_date, approved_date, last_update, artist, artist_unicode, title, title_unicode,
                  creator, creator_id, bpm, source, tags, genre_id, language_id, favourite_count, rating, storyboard,
                  video, download_unavailable, audio_unavailable, playcount, passcount, packs, max_combo, diff_aim,
                  diff_speed, difficultyrating):
         self.hit_objects = hit_objects
+        self.timing_points = timing_points 
         self.audio = audio
         self.split = split
         self.folder = folder
@@ -59,10 +60,34 @@ import math
 from typing import List, Tuple
 
     
-def process_hitobject(hitobject: str) -> List[str]:
+def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited_timingpointvar: int, timing_points: List[str]) -> Tuple[List[str], int, int]:
     parts = hitobject.split(',')
     hit_type = int(parts[3])
+
+    timestamp = int(parts[2])
+    timingpoint_for_this_hitobject = []
     
+    if float(timing_points[inherited_timingpointvar][1])>0 :
+
+        uninherited_timingpointvar = inherited_timingpointvar
+        # inherited_timingpointvar += 1
+    if int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
+        while int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
+            inherited_timingpointvar += 1
+    if int(timing_points[inherited_timingpointvar+1][0]) == timestamp:
+        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
+        inherited_timingpointvar += 1
+    else:
+        if inherited_timingpointvar == 0:
+            raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
+        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+    
+
+    #calc now
+    print(hitobject)
+    print(timingpoint_for_this_hitobject)
+
+
     if hit_type in {1, 5}:
         # Handle hit objects of type 1 or 4
         if len(parts)==5:
@@ -71,31 +96,34 @@ def process_hitobject(hitobject: str) -> List[str]:
         subpart.pop()
         subpart = [int(i) for i in subpart]
         parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 7 + subpart + [0]
-        return [parts + ['-1'] * (11 - len(parts))]  # Length 11
+        return [[parts + ['-1'] * (11 - len(parts))],uninherited_timingpointvar,inherited_timingpointvar]  # Length 11
     
     elif hit_type in {2, 6}:
         # Handle hit objects of type 2 or 6 (slider)
         # slider_data = parts[5]
         
-        return split_slider(hitobject)
+        return [split_slider(hitobject),uninherited_timingpointvar,inherited_timingpointvar]
     
     elif hit_type in {8, 12}:
         # Handle hit objects of type 8 or 12
         if len(parts)==6:
             parts.append("0:0:0:0:")
-        return [[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5]) ]+ [0] * 7 +[0,0,0,0,0]]  # Pad to length 11
+        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5]) ]+ [0] * 7 +[0,0,0,0,0]],uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
     
     else:
-        return [parts]  # Return as-is if no special handling    
+        return [[parts],uninherited_timingpointvar,inherited_timingpointvar]  # Return as-is if no special handling    
 
 
-
+    
 def parse_osu_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         data = {}
         hit_objects = []
+        timing_points  = []
         current_section = None
-        
+        uninherited_timingpointvar = 0
+        inherited_timingpointvar = 0
+        # inherit data
         for line in file:
             line = line.strip()
             if line.startswith('['):
@@ -104,16 +132,24 @@ def parse_osu_file(file_path):
                 continue
             
             if current_section == 'HitObjects' and line:
-                for l in process_hitobject(line):
+                objs,uninherited_timingpointvar,inherited_timingpointvar = process_hitobject(line,uninherited_timingpointvar,inherited_timingpointvar,timing_points)
+                for l in objs:
                     hit_objects.append(l)
                 continue
             
+            if current_section == 'TimingPoints' and line:
+                if(line == ""):
+                    continue
+                timing_points.append(line.split(','))
+                
+
             if ':' in line:
                 key, value = line.split(':', 1)
                 data[key.strip()] = value.strip()
     # Create an instance of OsuBeatmap using the parsed data
     return OsuBeatmap(
         hit_objects=hit_objects,
+        timing_points = timing_points, 
         audio=data.get('AudioFilename', ''),
         split='',  # Handle this if necessary
         folder='',  # Handle this if necessary
