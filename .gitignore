@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 /processed-audio
+/processed-beatmaps
+/processed-metadata
