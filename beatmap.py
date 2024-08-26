@@ -421,50 +421,118 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
 
 
 
+# def load_osu_files_from_df(df):
+#     new_df = pd.DataFrame()
+#     # Ensure the processed folder exists
+#     os.makedirs("processed-beatmaps", exist_ok=True)
+#     counter = 0
+    
+#     for index, row in df.iterrows():
+#         print(counter)
+#         counter += 1
+#         # Construct the osu! file path
+#         file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
+        
+#         # Check if the file exists before parsing
+#         if os.path.exists(file_path):
+#             # Parse the osu! file (assume this returns some data)
+#             data,hyperParamFooter = parse_osu_file(file_path)
+
+#             # Add a new column to the row
+#             row['StackLeniency'] = hyperParamFooter[0]
+#             row['DistanceSpacing'] = hyperParamFooter[1]
+#             row['BeatDivisor'] = hyperParamFooter[2]
+#             row['HPDrainRate'] = hyperParamFooter[3]
+#             row['CircleSize'] = hyperParamFooter[4]
+#             row['OverallDifficulty'] = hyperParamFooter[5]
+#             row['ApproachRate'] = hyperParamFooter[6]
+#             row['SliderTickRate'] = hyperParamFooter[7]
+#             row['SliderMultiplier'] = hyperParamFooter[8]
+            
+#             # # Convert the row to a DataFrame and append to new_df
+#             # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
+#             # # print(hyperParamFooter)
+            
+#             # # Convert the data to a NumPy array
+#             # data_array = np.array(data.hit_objects)
+            
+#             # # Define the save path in the processed folder
+#             # save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
+            
+#             # # Save the NumPy array to disk
+#             # np.save(save_path, data_array)
+#         else:
+#             print(f"File not found: {file_path}")
+    
+#     #save metadata also for retrieval later
+#     save_df_as_csv(new_df)
+
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+# Define a thread-safe counter
+progress_lock = threading.Lock()
+progress_counter = 0
+
+def process_file(index, row):
+    file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
+    
+    if os.path.exists(file_path):
+        # Parse the osu! file
+        data, hyperParamFooter = parse_osu_file(file_path)
+        
+        # Add the new columns to the row
+        row_dict = row.to_dict()
+        row_dict['StackLeniency'] = hyperParamFooter[0]
+        row_dict['DistanceSpacing'] = hyperParamFooter[1]
+        row_dict['BeatDivisor'] = hyperParamFooter[2]
+        row_dict['HPDrainRate'] = hyperParamFooter[3]
+        row_dict['CircleSize'] = hyperParamFooter[4]
+        row_dict['OverallDifficulty'] = hyperParamFooter[5]
+        row_dict['ApproachRate'] = hyperParamFooter[6]
+        row_dict['SliderTickRate'] = hyperParamFooter[7]
+        row_dict['SliderMultiplier'] = hyperParamFooter[8]
+
+        # # Convert the row to a DataFrame and append to new_df
+        new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
+        # print(hyperParamFooter)
+    
+        # Convert the data to a NumPy array
+        data_array = np.array(data.hit_objects)
+    
+        # Define the save path in the processed folder
+        save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
+    
+        # Save the NumPy array to disk
+        np.save(save_path, data_array)
+        
+        # Increment the progress counter in a thread-safe manner
+        with progress_lock:
+            global progress_counter
+            progress_counter += 1
+            print(f"Processed {progress_counter} files")
+
+        return row_dict
+    else:
+        print(f"File not found: {file_path}")
+        return None
+
 def load_osu_files_from_df(df):
     new_df = pd.DataFrame()
-    # Ensure the processed folder exists
     os.makedirs("processed-beatmaps", exist_ok=True)
-    counter = 0
-    
-    for index, row in df.iterrows():
-        print(counter)
-        counter += 1
-        # Construct the osu! file path
-        file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
-        
-        # Check if the file exists before parsing
-        if os.path.exists(file_path):
-            # Parse the osu! file (assume this returns some data)
-            data,hyperParamFooter = parse_osu_file(file_path)
 
-            # Add a new column to the row
-            row['StackLeniency'] = hyperParamFooter[0]
-            row['DistanceSpacing'] = hyperParamFooter[1]
-            row['BeatDivisor'] = hyperParamFooter[2]
-            row['HPDrainRate'] = hyperParamFooter[3]
-            row['CircleSize'] = hyperParamFooter[4]
-            row['OverallDifficulty'] = hyperParamFooter[5]
-            row['ApproachRate'] = hyperParamFooter[6]
-            row['SliderTickRate'] = hyperParamFooter[7]
-            row['SliderMultiplier'] = hyperParamFooter[8]
-            
-            # # Convert the row to a DataFrame and append to new_df
-            # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
-            # # print(hyperParamFooter)
-            
-            # # Convert the data to a NumPy array
-            # data_array = np.array(data.hit_objects)
-            
-            # # Define the save path in the processed folder
-            # save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
-            
-            # # Save the NumPy array to disk
-            # np.save(save_path, data_array)
-        else:
-            print(f"File not found: {file_path}")
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_file, index, row) for index, row in df.iterrows()]
+        results = []
+        
+        for future in as_completed(futures):
+            result = future.result()
+            if result is not None:
+                results.append(result)
     
-    #save metadata also for retrieval later
+    new_df = pd.DataFrame(results)
+    
+    # Save metadata also for retrieval later
     save_df_as_csv(new_df)
 
 
