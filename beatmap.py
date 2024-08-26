@@ -98,8 +98,8 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     if inherited_timingpointvar+1 == len(timing_points):
         timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
     else:
-        if int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
-            while int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
+        if int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
+            while int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
                 inherited_timingpointvar += 1
                 if inherited_timingpointvar+1 == len(timing_points):
                     timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
@@ -107,7 +107,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
                     break
 
         if not lastIndexFlag:
-            if int(timing_points[inherited_timingpointvar+1][0]) == timestamp:
+            if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
                 timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
                 inherited_timingpointvar += 1
             else:
@@ -493,18 +493,18 @@ def process_file(index, row):
         row_dict['SliderTickRate'] = hyperParamFooter[7]
         row_dict['SliderMultiplier'] = hyperParamFooter[8]
 
-        # # Convert the row to a DataFrame and append to new_df
-        new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
-        # print(hyperParamFooter)
+        # # # Convert the row to a DataFrame and append to new_df
+        # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
+        # # print(hyperParamFooter)
     
-        # Convert the data to a NumPy array
-        data_array = np.array(data.hit_objects)
+        # # Convert the data to a NumPy array
+        # data_array = np.array(data.hit_objects)
     
-        # Define the save path in the processed folder
-        save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
+        # # Define the save path in the processed folder
+        # save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
     
-        # Save the NumPy array to disk
-        np.save(save_path, data_array)
+        # # Save the NumPy array to disk
+        # np.save(save_path, data_array)
         
         # Increment the progress counter in a thread-safe manner
         with progress_lock:
