@@ -2,6 +2,7 @@ import math
 from typing import List, Tuple
 import os
 import numpy as np
+import pandas as pd
 from dotenv import load_dotenv
 
 #setting data path
@@ -70,9 +71,10 @@ class OsuBeatmap:
 
 
     
-def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited_timingpointvar: int, timing_points: List[str],sm:float) -> Tuple[List[str], int, int]:
+def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited_timingpointvar: int, timing_points: List[str],sm:str) -> Tuple[List[str], int, int]:
     parts = hitobject.split(',')
     hit_type = int(parts[3])
+    sm = float(sm)
 
     # Convert hit_type to a binary string
     binary_representation = bin(hit_type)[-4:]
@@ -157,7 +159,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
 
 
     
-def parse_osu_file(file_path):
+def parse_osu_file(file_path) -> Tuple[OsuBeatmap , List[str]]:
     with open(file_path, 'r', encoding='utf-8') as file:
         data = {}
         hit_objects = []
@@ -166,6 +168,7 @@ def parse_osu_file(file_path):
         uninherited_timingpointvar = 0
         inherited_timingpointvar = 0
         sliderMultiplier = 0
+        hyperParamFooter = ["","","","","","","","","",]
         # inherit data
         for line in file:
             line = line.strip()
@@ -189,10 +192,29 @@ def parse_osu_file(file_path):
             if ':' in line:
                 key, value = line.split(':', 1)
                 data[key.strip()] = value.strip()
-                if key.strip() == 'SliderMultiplier':
-                    sliderMultiplier = float(value.strip())
+                if key.strip() == 'StackLeniency':
+                    hyperParamFooter[0] = (value.strip())
+                    
+                elif key.strip() == 'DistanceSpacing':
+                    hyperParamFooter[1] = (value.strip())
+                elif key.strip() == 'BeatDivisor':
+                    hyperParamFooter[2] = (value.strip())
+                elif key.strip() == 'HPDrainRate':
+                    hyperParamFooter[3] = (value.strip())
+                elif key.strip() == 'CircleSize':
+                    hyperParamFooter[4] = (value.strip())
+                elif key.strip() == 'OverallDifficulty':
+                    hyperParamFooter[5] = (value.strip())
+                elif key.strip() == 'ApproachRate':
+                    hyperParamFooter[6] = (value.strip())
+                elif key.strip() == 'SliderTickRate':
+                    hyperParamFooter[7] = (value.strip())
+                elif key.strip() == 'SliderMultiplier':
+                    sliderMultiplier = (value.strip())
+                    hyperParamFooter[8]=sliderMultiplier
+
     # Create an instance of OsuBeatmap using the parsed data
-    return OsuBeatmap(
+    return [OsuBeatmap(
         hit_objects=hit_objects,
         timing_points = timing_points, 
         audio=data.get('AudioFilename', ''),
@@ -241,7 +263,7 @@ def parse_osu_file(file_path):
         diff_speed=float(data.get('DifficultySpeed', 0)),
         difficultyrating=float(data.get('DifficultyRating', 0)),
         sliderMultiplier=float(data.get('SliderMultiplier', 0))
-    )
+    ),hyperParamFooter]
 
 
 
@@ -384,6 +406,7 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
 
 
 def load_osu_files_from_df(df):
+    new_df = pd.DataFrame()
     # Ensure the processed folder exists
     os.makedirs("processed-beatmaps", exist_ok=True)
     
@@ -394,7 +417,22 @@ def load_osu_files_from_df(df):
         # Check if the file exists before parsing
         if os.path.exists(file_path):
             # Parse the osu! file (assume this returns some data)
-            data = parse_osu_file(file_path)
+            data,hyperParamFooter = parse_osu_file(file_path)
+
+            # Add a new column to the row
+            row['StackLeniency'] = hyperParamFooter[0]
+            row['DistanceSpacing'] = hyperParamFooter[0]
+            row['BeatDivisor'] = hyperParamFooter[0]
+            row['HPDrainRate'] = hyperParamFooter[0]
+            row['CircleSize'] = hyperParamFooter[0]
+            row['OverallDifficulty'] = hyperParamFooter[0]
+            row['ApproachRate'] = hyperParamFooter[0]
+            row['SliderTickRate'] = hyperParamFooter[0]
+            row['SliderMultiplier'] = hyperParamFooter[0]
+            
+            # Convert the row to a DataFrame and append to new_df
+            new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
+            # print(hyperParamFooter)
             
             # Convert the data to a NumPy array
             data_array = np.array(data.hit_objects)
@@ -406,6 +444,9 @@ def load_osu_files_from_df(df):
             np.save(save_path, data_array)
         else:
             print(f"File not found: {file_path}")
+    
+    #save metadata also for retrieval later
+    save_df_as_csv(new_df)
 
 
 def save_df_as_csv(df):

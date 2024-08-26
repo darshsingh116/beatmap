@@ -37,8 +37,7 @@ def brew():
     # Cook the .osu data
     load_osu_files_from_df(df)
 
-    #save metadata also for retrieval later
-    save_df_as_csv(df)
+    #we are saving metadata inside load_osu_siles_from_df func as we are modifying df with addition of hyperparams and then saving
 
 
      # End the timer (Toc)
