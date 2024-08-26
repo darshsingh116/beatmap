@@ -89,6 +89,8 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     timestamp = int(parts[2])
     timingpoint_for_this_hitobject = []
     
+    lastIndexFlag = False
+    
     if float(timing_points[inherited_timingpointvar][1])>0 :
 
         uninherited_timingpointvar = inherited_timingpointvar
@@ -99,18 +101,22 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         if int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
             while int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
                 inherited_timingpointvar += 1
+                if inherited_timingpointvar+1 == len(timing_points):
+                    timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+                    lastIndexFlag = True
+                    break
 
-
-        if int(timing_points[inherited_timingpointvar+1][0]) == timestamp:
-            timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
-            inherited_timingpointvar += 1
-        else:
-            if inherited_timingpointvar == 0:
-                timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
-                # raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
+        if not lastIndexFlag:
+            if int(timing_points[inherited_timingpointvar+1][0]) == timestamp:
+                timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
+                inherited_timingpointvar += 1
             else:
-                timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
-    
+                if inherited_timingpointvar == 0:
+                    timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+                    # raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
+                else:
+                    timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+        
 
     #calc now
     # print(hitobject)
@@ -298,7 +304,11 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
     if sliderdatalen<9:
         parts.append("0|0")
     if sliderdatalen<10:
-        parts.append("0:0|0:0")
+        slider_points = parts[8].split('|')
+        num_points = len(slider_points)
+        temppart = "0:0|"*num_points
+        temppart = temppart[:-1]
+        parts.append(temppart)
     if sliderdatalen<11:
         parts.append("0:0:0:0:")
 
@@ -317,8 +327,17 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
     # Calculate path points
     path_points = [start_point] + [tuple(map(int, p.split(':'))) for p in path_data.split('|')]
 
+    if slider_type == 'P' and len(path_points) == 2:
+        slider_type = 'L'
+
     # Initialize new segments list
     new_segments = []
+
+    subpart = parts[-1].split(":")
+    subpart.pop()
+    subpart = [int(i) for i in subpart]
+    if len(subpart) < 4:
+        subpart = subpart + [0]*(4-len(subpart))
     
     # Generate new segments based on slider type
     if slider_type == 'L':
@@ -327,22 +346,20 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
             t = i / (num_points - 1)
             new_x = interpolate_linear(start_point[0], path_points[-1][0], t)
             new_y = interpolate_linear(start_point[1], path_points[-1][1], t)
-            subpart = parts[-1].split(":")
-            subpart.pop()
-            subpart = [int(i) for i in subpart]
+            
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')] #+[int(i) for i in slider_points_data[i+1].split(':')]
             segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
-    elif slider_type == 'B':
+    elif slider_type == 'B' or slider_type == 'C':
+        # print(slider_data)
+        # print(slider_points_data)
         # Bezier curve interpolation
         for i in range(num_points):
             t = i / (num_points - 1)
             new_x, new_y = bezier_point(t, path_points)
-            subpart = parts[-1].split(":")
-            subpart.pop()
-            subpart = [int(i) for i in subpart]
+            
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
             segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
@@ -370,21 +387,19 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
 
         
          # Calculate path points
-        path_points = [start_point] + [tuple(map(int, p.split(':'))) for p in path_data.split('|')]
         if num_points==2 :
             slider_points = slider_points + ["0"]
             slider_points_data = slider_points_data + ["0:0"]
         elif num_points>3:
             slider_points = slider_points[0:3]
             slider_points_data = slider_points_data[0:3]
+        # print(slider_data)
         # print(slider_points)
         # print(path_points)
         num_points = len(slider_points)
         for i in range(num_points):
             new_x, new_y = (path_points[i][0],path_points[i][1])
-            subpart = parts[-1].split(":")
-            subpart.pop()
-            subpart = [int(i) for i in subpart]
+            
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
             segment = [int(new_x),int(new_y),(int(parts[2])+int(float(slider_duration_per_sliderpoint/2)*i)),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
@@ -393,7 +408,8 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
 
         # print(slider_data)
         # print(new_segments)
-    
+    else:
+        raise ValueError("New Slider type found")
     # print(new_segments)
 
     return new_segments
@@ -409,8 +425,11 @@ def load_osu_files_from_df(df):
     new_df = pd.DataFrame()
     # Ensure the processed folder exists
     os.makedirs("processed-beatmaps", exist_ok=True)
+    counter = 0
     
     for index, row in df.iterrows():
+        print(counter)
+        counter += 1
         # Construct the osu! file path
         file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
         
@@ -430,18 +449,18 @@ def load_osu_files_from_df(df):
             row['SliderTickRate'] = hyperParamFooter[7]
             row['SliderMultiplier'] = hyperParamFooter[8]
             
-            # Convert the row to a DataFrame and append to new_df
-            new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
-            # print(hyperParamFooter)
+            # # Convert the row to a DataFrame and append to new_df
+            # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
+            # # print(hyperParamFooter)
             
-            # Convert the data to a NumPy array
-            data_array = np.array(data.hit_objects)
+            # # Convert the data to a NumPy array
+            # data_array = np.array(data.hit_objects)
             
-            # Define the save path in the processed folder
-            save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
+            # # Define the save path in the processed folder
+            # save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
             
-            # Save the NumPy array to disk
-            np.save(save_path, data_array)
+            # # Save the NumPy array to disk
+            # np.save(save_path, data_array)
         else:
             print(f"File not found: {file_path}")
     
