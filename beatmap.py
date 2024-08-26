@@ -421,14 +421,14 @@ def load_osu_files_from_df(df):
 
             # Add a new column to the row
             row['StackLeniency'] = hyperParamFooter[0]
-            row['DistanceSpacing'] = hyperParamFooter[0]
-            row['BeatDivisor'] = hyperParamFooter[0]
-            row['HPDrainRate'] = hyperParamFooter[0]
-            row['CircleSize'] = hyperParamFooter[0]
-            row['OverallDifficulty'] = hyperParamFooter[0]
-            row['ApproachRate'] = hyperParamFooter[0]
-            row['SliderTickRate'] = hyperParamFooter[0]
-            row['SliderMultiplier'] = hyperParamFooter[0]
+            row['DistanceSpacing'] = hyperParamFooter[1]
+            row['BeatDivisor'] = hyperParamFooter[2]
+            row['HPDrainRate'] = hyperParamFooter[3]
+            row['CircleSize'] = hyperParamFooter[4]
+            row['OverallDifficulty'] = hyperParamFooter[5]
+            row['ApproachRate'] = hyperParamFooter[6]
+            row['SliderTickRate'] = hyperParamFooter[7]
+            row['SliderMultiplier'] = hyperParamFooter[8]
             
             # Convert the row to a DataFrame and append to new_df
             new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
