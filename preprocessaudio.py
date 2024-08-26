@@ -36,7 +36,7 @@ def preprocess_and_save_audio(df):
         mfcc = np.transpose(mfcc)
         
         # Construct the save path
-        save_path = os.path.join(processed_dir, f"{row['audio']}.npy")
+        save_path = os.path.join(processed_dir, f"{row['audio']}-a.npy")
         
         # Save the MFCC features as a .npy file
         np.save(save_path, mfcc)

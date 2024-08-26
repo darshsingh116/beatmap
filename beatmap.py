@@ -1,10 +1,21 @@
+import math
+from typing import List, Tuple
+import os
+import numpy as np
+from dotenv import load_dotenv
+
+#setting data path
+load_dotenv()
+archive_path = os.getenv('ARCHIVE_PATH')
+
+
 class OsuBeatmap:
     def __init__(self,hit_objects, timing_points  ,audio, split, folder, beatmapset_id, beatmap_id, approved, total_length, hit_length, version,
                  file_md5, diff_size, diff_overall, diff_approach, diff_drain, mode, count_normal, count_slider,
                  count_spinner, submit_date, approved_date, last_update, artist, artist_unicode, title, title_unicode,
                  creator, creator_id, bpm, source, tags, genre_id, language_id, favourite_count, rating, storyboard,
                  video, download_unavailable, audio_unavailable, playcount, passcount, packs, max_combo, diff_aim,
-                 diff_speed, difficultyrating):
+                 diff_speed, difficultyrating ,sliderMultiplier):
         self.hit_objects = hit_objects
         self.timing_points = timing_points 
         self.audio = audio
@@ -52,18 +63,18 @@ class OsuBeatmap:
         self.diff_aim = diff_aim
         self.diff_speed = diff_speed
         self.difficultyrating = difficultyrating
+        self.sliderMultiplier = sliderMultiplier
 
     def __repr__(self):
         return f"OsuBeatmap({self.title} - {self.artist})"
 
-import math
-from typing import List, Tuple
 
     
-def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited_timingpointvar: int, timing_points: List[str]) -> Tuple[List[str], int, int]:
+def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited_timingpointvar: int, timing_points: List[str],sm:float) -> Tuple[List[str], int, int]:
     parts = hitobject.split(',')
     hit_type = int(parts[3])
 
+    #calc corresponding timing point
     timestamp = int(parts[2])
     timingpoint_for_this_hitobject = []
     
@@ -84,8 +95,10 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     
 
     #calc now
-    print(hitobject)
-    print(timingpoint_for_this_hitobject)
+    # print(hitobject)
+    # print(timingpoint_for_this_hitobject)
+
+
 
 
     if hit_type in {1, 5}:
@@ -101,8 +114,13 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     elif hit_type in {2, 6}:
         # Handle hit objects of type 2 or 6 (slider)
         # slider_data = parts[5]
+            #calc slider duration
+        beatlen=float(timing_points[uninherited_timingpointvar][1])
+        svm = (100.0/abs(float(timingpoint_for_this_hitobject[1])))
+        length = float(parts[7])
+        slider_duration_per_sliderpoint = (length / (sm * 100 * svm) * beatlen)
         
-        return [split_slider(hitobject),uninherited_timingpointvar,inherited_timingpointvar]
+        return [split_slider(hitobject,slider_duration_per_sliderpoint,timingpoint_for_this_hitobject),uninherited_timingpointvar,inherited_timingpointvar]
     
     elif hit_type in {8, 12}:
         # Handle hit objects of type 8 or 12
@@ -123,6 +141,7 @@ def parse_osu_file(file_path):
         current_section = None
         uninherited_timingpointvar = 0
         inherited_timingpointvar = 0
+        sliderMultiplier = 0
         # inherit data
         for line in file:
             line = line.strip()
@@ -132,7 +151,7 @@ def parse_osu_file(file_path):
                 continue
             
             if current_section == 'HitObjects' and line:
-                objs,uninherited_timingpointvar,inherited_timingpointvar = process_hitobject(line,uninherited_timingpointvar,inherited_timingpointvar,timing_points)
+                objs,uninherited_timingpointvar,inherited_timingpointvar = process_hitobject(line,uninherited_timingpointvar,inherited_timingpointvar,timing_points,sliderMultiplier)
                 for l in objs:
                     hit_objects.append(l)
                 continue
@@ -146,6 +165,8 @@ def parse_osu_file(file_path):
             if ':' in line:
                 key, value = line.split(':', 1)
                 data[key.strip()] = value.strip()
+                if key.strip() == 'SliderMultiplier':
+                    sliderMultiplier = float(value.strip())
     # Create an instance of OsuBeatmap using the parsed data
     return OsuBeatmap(
         hit_objects=hit_objects,
@@ -194,7 +215,8 @@ def parse_osu_file(file_path):
         max_combo=int(data.get('MaxCombo', 0)),
         diff_aim=float(data.get('DifficultyAim', 0)),
         diff_speed=float(data.get('DifficultySpeed', 0)),
-        difficultyrating=float(data.get('DifficultyRating', 0))
+        difficultyrating=float(data.get('DifficultyRating', 0)),
+        sliderMultiplier=float(data.get('SliderMultiplier', 0))
     )
 
 
@@ -219,7 +241,7 @@ def circle_point(center, radius, angle):
     )
 
 # Function to split slider into segments
-def split_slider(slider_data: str):
+def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timingpoint_for_this_hitobject: List[str]):
     # print(slider_data)
     # Parse slider_data
     parts = slider_data.split(',')
@@ -264,7 +286,7 @@ def split_slider(slider_data: str):
             subpart = [int(i) for i in subpart]
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')] #+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
     elif slider_type == 'B':
@@ -277,7 +299,7 @@ def split_slider(slider_data: str):
             subpart = [int(i) for i in subpart]
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
     elif slider_type == 'P':
@@ -319,7 +341,7 @@ def split_slider(slider_data: str):
             subpart = [int(i) for i in subpart]
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),int(parts[2]),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),(int(parts[2])+int(float(slider_duration_per_sliderpoint/2)*i)),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
             new_segments.append(segment)
 
 
@@ -333,8 +355,44 @@ def split_slider(slider_data: str):
 # # Example slider data and split operation
 # slider_data = "431,86,96039,6,0,P|406:144|433:238,1,157.500006008148,0|0,1:0|0:0,0:0:0:0:"
 
-# # Split the slider into segments
-# new_slider_segments = split_slider(slider_data)
-# # Output the new segments
-# for segment in new_slider_segments:
-#     print(segment)
+
+
+
+
+def load_osu_files_from_df(df):
+    # Ensure the processed folder exists
+    os.makedirs("processed-beatmaps", exist_ok=True)
+    
+    for index, row in df.iterrows():
+        # Construct the osu! file path
+        file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
+        
+        # Check if the file exists before parsing
+        if os.path.exists(file_path):
+            # Parse the osu! file (assume this returns some data)
+            data = parse_osu_file(file_path)
+            
+            # Convert the data to a NumPy array
+            data_array = np.array(data)
+            
+            # Define the save path in the processed folder
+            save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
+            
+            # Save the NumPy array to disk
+            np.save(save_path, data_array)
+        else:
+            print(f"File not found: {file_path}")
+
+
+def save_df_as_numpy(df):
+    # Ensure the processed metadata folder exists
+    os.makedirs("processed-metadata", exist_ok=True)
+    
+    # Convert the DataFrame to a NumPy array
+    df_array = df.to_numpy()
+    
+    # Define the save path in the processed metadata folder
+    save_path = os.path.join("processed-metadata", "processed-metadata.npy")
+    
+    # Save the NumPy array to disk
+    np.save(save_path, df_array)
