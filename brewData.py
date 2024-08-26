@@ -15,7 +15,7 @@ def brew():
 
     #select dataset from metadata
     df=pd.read_csv("metadata.csv")
-    df = df[(df["difficultyrating"]>5) & (df["difficultyrating"]<5.001) & (df["split"]=="train")]
+    df = df[(df["mode"] == 0) & (df["difficultyrating"]>5) & (df["difficultyrating"]<5.001) & (df["split"]=="train")]
     #df = df[df["audio"].str.contains("c367ac169")]
 
     # Preprocess and store all audio data tobe trained

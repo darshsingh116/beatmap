@@ -74,6 +74,15 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     parts = hitobject.split(',')
     hit_type = int(parts[3])
 
+    # Convert hit_type to a binary string
+    binary_representation = bin(hit_type)[-4:]
+
+    # Check the last three bits
+    last_three_bits = binary_representation.zfill(3)  # Ensure it's always 3 bits long
+
+    # Find indices of '1' bits
+    indices_of_ones = [i for i, bit in enumerate(reversed(last_three_bits)) if bit == '1']
+
     #calc corresponding timing point
     timestamp = int(parts[2])
     timingpoint_for_this_hitobject = []
@@ -105,20 +114,22 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     # print(hitobject)
     # print(timingpoint_for_this_hitobject)
 
+    uninherited_timingpoint_for_this_hitobject = timing_points[uninherited_timingpointvar]
+    timingpoint_for_this_hitobject[1] = str(abs(float(timingpoint_for_this_hitobject[1])))
 
+    footerListWithTimingPointsData = [float(value) for value in timingpoint_for_this_hitobject] + [float(value) for value in uninherited_timingpoint_for_this_hitobject]
 
-
-    if hit_type in {1, 5}:
+    if 0 in indices_of_ones:
         # Handle hit objects of type 1 or 4
         if len(parts)==5:
             parts.append("0:0:0:0:")
         subpart = parts[5].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 7 + subpart + [0]
-        return [[parts + ['-1'] * (11 - len(parts))],uninherited_timingpointvar,inherited_timingpointvar]  # Length 11
+        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]
+        return [parts+footerListWithTimingPointsData ,uninherited_timingpointvar,inherited_timingpointvar]  # Length 11
     
-    elif hit_type in {2, 6}:
+    elif 1 in indices_of_ones:
         # Handle hit objects of type 2 or 6 (slider)
         # slider_data = parts[5]
             #calc slider duration
@@ -126,17 +137,23 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         svm = (100.0/abs(float(timingpoint_for_this_hitobject[1])))
         length = float(parts[7])
         slider_duration_per_sliderpoint = (length / (sm * 100 * svm) * beatlen)
-        
-        return [split_slider(hitobject,slider_duration_per_sliderpoint,timingpoint_for_this_hitobject),uninherited_timingpointvar,inherited_timingpointvar]
+        split_slider_list = split_slider(hitobject,slider_duration_per_sliderpoint,timingpoint_for_this_hitobject)
+        split_slider_with_footer = [sublist + footerListWithTimingPointsData for sublist in split_slider_list]
+        return [split_slider_with_footer,uninherited_timingpointvar,inherited_timingpointvar]
     
-    elif hit_type in {8, 12}:
+    elif 3 in indices_of_ones:
         # Handle hit objects of type 8 or 12
         if len(parts)==6:
             parts.append("0:0:0:0:")
-        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5]) ]+ [0] * 7 +[0,0,0,0,0]],uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
+        subpart = parts[6].split(":")
+        subpart.pop()
+        subpart = [int(i) for i in subpart]
+        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5])]+ [0] * 7 +subpart+[0]]+footerListWithTimingPointsData,uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
     
     else:
-        return [[parts],uninherited_timingpointvar,inherited_timingpointvar]  # Return as-is if no special handling    
+        print(hit_type)
+        print(hitobject)
+        raise ValueError("Anomoly where hit type is other tan 1,5,2,6,8,12 ... in beatmap.py line 141.")  # Return as-is if no special handling    
 
 
     
