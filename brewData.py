@@ -20,7 +20,7 @@ def brew():
 
     # Preprocess and store all audio data tobe trained
     
-    preprocess_and_save_audio_in_parallel(df)
+    # preprocess_and_save_audio_in_parallel(df)
     # preprocess_and_save_audio(df)
 
     # End the timer (Toc)
@@ -38,7 +38,7 @@ def brew():
     load_osu_files_from_df(df)
 
     #save metadata also for retrieval later
-    save_df_as_numpy(df)
+    save_df_as_csv(df)
 
 
      # End the timer (Toc)

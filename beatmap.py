@@ -127,7 +127,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart.pop()
         subpart = [int(i) for i in subpart]
         parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]
-        return [parts+footerListWithTimingPointsData ,uninherited_timingpointvar,inherited_timingpointvar]  # Length 11
+        return [[parts+footerListWithTimingPointsData] ,uninherited_timingpointvar,inherited_timingpointvar]  # Length 11
     
     elif 1 in indices_of_ones:
         # Handle hit objects of type 2 or 6 (slider)
@@ -138,7 +138,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         length = float(parts[7])
         slider_duration_per_sliderpoint = (length / (sm * 100 * svm) * beatlen)
         split_slider_list = split_slider(hitobject,slider_duration_per_sliderpoint,timingpoint_for_this_hitobject)
-        split_slider_with_footer = [sublist + footerListWithTimingPointsData for sublist in split_slider_list]
+        split_slider_with_footer = [sublist+footerListWithTimingPointsData for sublist in split_slider_list]
         return [split_slider_with_footer,uninherited_timingpointvar,inherited_timingpointvar]
     
     elif 3 in indices_of_ones:
@@ -148,7 +148,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart = parts[6].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5])]+ [0] * 7 +subpart+[0]]+footerListWithTimingPointsData,uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
+        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5])]+ [0] * 7 +subpart+[0] + footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
     
     else:
         print(hit_type)
@@ -397,7 +397,7 @@ def load_osu_files_from_df(df):
             data = parse_osu_file(file_path)
             
             # Convert the data to a NumPy array
-            data_array = np.array(data)
+            data_array = np.array(data.hit_objects)
             
             # Define the save path in the processed folder
             save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
@@ -408,15 +408,13 @@ def load_osu_files_from_df(df):
             print(f"File not found: {file_path}")
 
 
-def save_df_as_numpy(df):
+def save_df_as_csv(df):
     # Ensure the processed metadata folder exists
     os.makedirs("processed-metadata", exist_ok=True)
     
-    # Convert the DataFrame to a NumPy array
-    df_array = df.to_numpy()
-    
     # Define the save path in the processed metadata folder
-    save_path = os.path.join("processed-metadata", "processed-metadata.npy")
+    save_path = os.path.join("processed-metadata", "processed-metadata.csv")
     
-    # Save the NumPy array to disk
-    np.save(save_path, df_array)
+    # Save the DataFrame as a CSV file
+    df.to_csv(save_path, index=False)
+    print(f"DataFrame saved as a CSV at: {save_path}")
