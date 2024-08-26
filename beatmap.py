@@ -82,16 +82,23 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
 
         uninherited_timingpointvar = inherited_timingpointvar
         # inherited_timingpointvar += 1
-    if int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
-        while int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
-            inherited_timingpointvar += 1
-    if int(timing_points[inherited_timingpointvar+1][0]) == timestamp:
-        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
-        inherited_timingpointvar += 1
-    else:
-        if inherited_timingpointvar == 0:
-            raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
+    if inherited_timingpointvar+1 == len(timing_points):
         timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+    else:
+        if int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
+            while int(timing_points[inherited_timingpointvar+1][0]) < timestamp:
+                inherited_timingpointvar += 1
+
+
+        if int(timing_points[inherited_timingpointvar+1][0]) == timestamp:
+            timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
+            inherited_timingpointvar += 1
+        else:
+            if inherited_timingpointvar == 0:
+                timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+                # raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
+            else:
+                timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
     
 
     #calc now
