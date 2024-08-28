@@ -279,11 +279,27 @@ def interpolate_linear(start, end, t):
     return start + t * (end - start)
 
 # Function to calculate a point on a quadratic Bezier curve
+
+# def bezier_point(t, points):
+#     n = len(points) - 1
+#     x, y = 0.0, 0.0
+#     for i in range(n + 1):
+#         comb = math.comb(n, i)
+#         term = (1 - t)**(n - i) * t**i
+#         x += comb * term * points[i][0]
+#         y += comb * term * points[i][1]
+#     return x, y
 def bezier_point(t, points):
-    n = len(points) - 1
-    x = sum(math.comb(n, i) * (1 - t)**(n - i) * t**i * points[i][0] for i in range(n + 1))
-    y = sum(math.comb(n, i) * (1 - t)**(n - i) * t**i * points[i][1] for i in range(n + 1))
-    return x, y
+    points = [list(point) for point in points]
+    n = len(points)
+    
+    for r in range(1, n):
+        for i in range(n - r):
+            points[i][0] = (1 - t) * points[i][0] + t * points[i + 1][0]
+            points[i][1] = (1 - t) * points[i][1] + t * points[i + 1][1]
+    
+    return points[0][0], points[0][1]
+
 
 # Function to calculate a point on a perfect circle (P slider type)
 def circle_point(center, radius, angle):
@@ -322,6 +338,11 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
     
     slider_points = parts[8].split('|')
     slider_points_data = parts[9].split('|')
+    num_points = len(slider_points)
+    if num_points == 1:
+        sp = int(parts[8])
+        slider_points = [sp,sp]
+        slider_points_data = slider_points_data + slider_points_data
     num_points = len(slider_points)
 
     # Calculate path points
@@ -475,65 +496,102 @@ progress_lock = threading.Lock()
 progress_counter = 0
 
 def process_file(index, row):
-    file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
-    
-    if os.path.exists(file_path):
-        # Parse the osu! file
-        data, hyperParamFooter = parse_osu_file(file_path)
+    try:
+        file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
         
-        # Add the new columns to the row
-        row_dict = row.to_dict()
-        row_dict['StackLeniency'] = hyperParamFooter[0]
-        row_dict['DistanceSpacing'] = hyperParamFooter[1]
-        row_dict['BeatDivisor'] = hyperParamFooter[2]
-        row_dict['HPDrainRate'] = hyperParamFooter[3]
-        row_dict['CircleSize'] = hyperParamFooter[4]
-        row_dict['OverallDifficulty'] = hyperParamFooter[5]
-        row_dict['ApproachRate'] = hyperParamFooter[6]
-        row_dict['SliderTickRate'] = hyperParamFooter[7]
-        row_dict['SliderMultiplier'] = hyperParamFooter[8]
+        if os.path.exists(file_path):
+            # Parse the osu! file
+            data, hyperParamFooter = parse_osu_file(file_path)
+            
+            # Add the new columns to the row
+            row_dict = row.to_dict()
+            row_dict['StackLeniency'] = hyperParamFooter[0]
+            row_dict['DistanceSpacing'] = hyperParamFooter[1]
+            row_dict['BeatDivisor'] = hyperParamFooter[2]
+            row_dict['HPDrainRate'] = hyperParamFooter[3]
+            row_dict['CircleSize'] = hyperParamFooter[4]
+            row_dict['OverallDifficulty'] = hyperParamFooter[5]
+            row_dict['ApproachRate'] = hyperParamFooter[6]
+            row_dict['SliderTickRate'] = hyperParamFooter[7]
+            row_dict['SliderMultiplier'] = hyperParamFooter[8]
 
-        # # # Convert the row to a DataFrame and append to new_df
-        # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
-        # # print(hyperParamFooter)
-    
-        # # Convert the data to a NumPy array
-        # data_array = np.array(data.hit_objects)
-    
-        # # Define the save path in the processed folder
-        # save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
-    
-        # # Save the NumPy array to disk
-        # np.save(save_path, data_array)
+            # # # Convert the row to a DataFrame and append to new_df
+            # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
+            # # print(hyperParamFooter)
         
-        # Increment the progress counter in a thread-safe manner
-        with progress_lock:
-            global progress_counter
-            progress_counter += 1
-            print(f"Processed {progress_counter} files")
+            # # Convert the data to a NumPy array
+            # data_array = np.array(data.hit_objects)
+        
+            # # Define the save path in the processed folder
+            # save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
+        
+            # # Save the NumPy array to disk
+            # np.save(save_path, data_array)
+            
+            # Increment the progress counter in a thread-safe manner
+            with progress_lock:
+                global progress_counter
+                progress_counter += 1
+                print(f"Processed {progress_counter} files")
 
-        return row_dict
-    else:
-        print(f"File not found: {file_path}")
-        return None
+            return [True,row_dict]
+        else:
+            print(f"File not found: {file_path}")
+            return [False,row]
+        
+    except Exception as e:
+        logging.error(f"Error processing row {index}: {e}")
+        return [False,row]
+
+# def load_osu_files_from_df(df):
+#     new_df = pd.DataFrame()
+#     os.makedirs("processed-beatmaps", exist_ok=True)
+
+#     with ThreadPoolExecutor() as executor:
+#         futures = [executor.submit(process_file, index, row) for index, row in df.iterrows()]
+#         results = []
+        
+#         for future in as_completed(futures):
+#             result = future.result()
+#             if result is not None:
+#                 results.append(result)
+    
+#     new_df = pd.DataFrame(results)
+    
+#     # Save metadata also for retrieval later
+#     save_df_as_csv(new_df)
+
+import logging
+# Set up logging
+logging.basicConfig(filename='error_log.txt', level=logging.ERROR, format='%(asctime)s - %(message)s')
 
 def load_osu_files_from_df(df):
-    new_df = pd.DataFrame()
     os.makedirs("processed-beatmaps", exist_ok=True)
+    results = []
+    error_count = 0
+    error_rows = []
 
     with ThreadPoolExecutor() as executor:
         futures = [executor.submit(process_file, index, row) for index, row in df.iterrows()]
-        results = []
-        
+
         for future in as_completed(futures):
             result = future.result()
-            if result is not None:
-                results.append(result)
-    
+            if result[0]:
+                results.append(result[1])
+            else:
+                error_count += 1
+                error_rows.append(result[1])
+
     new_df = pd.DataFrame(results)
     
-    # Save metadata also for retrieval later
+
+    # Save the successfully processed data
     save_df_as_csv(new_df)
+    
+    # Log summary of errors
+    print(f"Total errors encountered: {error_count}")
+    for row in error_rows:
+        print(f"Error in row : {row}")
 
 
 def save_df_as_csv(df):
