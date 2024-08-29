@@ -519,15 +519,19 @@ def process_file(index, row):
             # new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)
             # # print(hyperParamFooter)
         
-            # # Convert the data to a NumPy array
-            # data_array = np.array(data.hit_objects)
+            # Convert the data to a NumPy array
+            data_array = np.array(data.hit_objects)
         
-            # # Define the save path in the processed folder
-            # save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
+            # Define the save path in the processed folder
+            save_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
         
-            # # Save the NumPy array to disk
-            # np.save(save_path, data_array)
+            # Save the NumPy array to disk
+            np.save(save_path, data_array)
             
+        
+        
+        
+        
             # Increment the progress counter in a thread-safe manner
             with progress_lock:
                 global progress_counter
