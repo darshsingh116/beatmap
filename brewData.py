@@ -16,20 +16,19 @@ def brew():
     #select dataset from metadata
     df=pd.read_csv("metadata.csv")
     df = df[(df["mode"] == 0) & (df["difficultyrating"]>4.8) & (df["difficultyrating"]< 6) & (df["split"]=="train")]
-    # df = df[7616:7617]
-    #df = df[df["audio"].str.contains("c367ac169")]
+    df = df[1:2]
 
     # Preprocess and store all audio data tobe trained
     
-    # preprocess_and_save_audio_in_parallel(df)
+    preprocess_and_save_audio_in_parallel(df)
     # preprocess_and_save_audio(df)
 
     # End the timer (Toc)
-    # toc = time.time()
+    toc = time.time()
 
-    # # Calculate and print the elapsed time
-    # elapsed_time = toc - tic
-    # print(f"Elapsed time to preprocess audio: {elapsed_time:.2f} seconds")
+    # Calculate and print the elapsed time
+    elapsed_time = toc - tic
+    print(f"Elapsed time to preprocess audio: {elapsed_time:.2f} seconds")
 
 
     # #note time for beatmap

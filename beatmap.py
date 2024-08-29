@@ -91,9 +91,9 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     
     lastIndexFlag = False
     
-    if float(timing_points[inherited_timingpointvar][1])>0 :
-
+    if (float(timing_points[inherited_timingpointvar][1]) > 0) :
         uninherited_timingpointvar = inherited_timingpointvar
+        # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
         # inherited_timingpointvar += 1
     if inherited_timingpointvar+1 == len(timing_points):
         timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
@@ -123,9 +123,13 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     # print(timingpoint_for_this_hitobject)
 
     uninherited_timingpoint_for_this_hitobject = timing_points[uninherited_timingpointvar]
-    timingpoint_for_this_hitobject[1] = str(abs(float(timingpoint_for_this_hitobject[1])))
+    
+    # print(uninherited_timingpoint_for_this_hitobject)
+    # timingpoint_for_this_hitobject[1] = str(abs(float(timingpoint_for_this_hitobject[1])))
+    timingpoint_for_this_hitobject_with_posVal = list(timingpoint_for_this_hitobject)
+    timingpoint_for_this_hitobject_with_posVal[1] = str(abs(float(timingpoint_for_this_hitobject_with_posVal[1])))
 
-    footerListWithTimingPointsData = [float(value) for value in timingpoint_for_this_hitobject] + [float(value) for value in uninherited_timingpoint_for_this_hitobject]
+    footerListWithTimingPointsData = [float(value) for value in timingpoint_for_this_hitobject_with_posVal] + [float(value) for value in uninherited_timingpoint_for_this_hitobject]
 
     if 0 in indices_of_ones:
         # Handle hit objects of type 1 or 4
@@ -159,8 +163,8 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5])]+ [0] * 7 +subpart+[0] + footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
     
     else:
-        print(hit_type)
-        print(hitobject)
+        # print(hit_type)
+        # print(hitobject)
         raise ValueError("Anomoly where hit type is other tan 1,5,2,6,8,12 ... in beatmap.py line 141.")  # Return as-is if no special handling    
 
 
@@ -177,6 +181,8 @@ def parse_osu_file(file_path) -> Tuple[OsuBeatmap , List[str]]:
         hyperParamFooter = ["","","","","","","","","",]
         # inherit data
         for line in file:
+            # print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            # print(timing_points)
             line = line.strip()
             if line.startswith('['):
                 # Handle section headers
@@ -192,15 +198,16 @@ def parse_osu_file(file_path) -> Tuple[OsuBeatmap , List[str]]:
             if current_section == 'TimingPoints' and line:
                 if(line == ""):
                     continue
-                timing_points.append(line.split(','))
-                
+                tp = line.split(',')
+                # print("Before conv ",tp)
+                timing_points.append(tp)
+                # print("After conversion:", timing_points)
 
             if ':' in line:
                 key, value = line.split(':', 1)
                 data[key.strip()] = value.strip()
                 if key.strip() == 'StackLeniency':
                     hyperParamFooter[0] = (value.strip())
-                    
                 elif key.strip() == 'DistanceSpacing':
                     hyperParamFooter[1] = (value.strip())
                 elif key.strip() == 'BeatDivisor':
@@ -218,6 +225,7 @@ def parse_osu_file(file_path) -> Tuple[OsuBeatmap , List[str]]:
                 elif key.strip() == 'SliderMultiplier':
                     sliderMultiplier = (value.strip())
                     hyperParamFooter[8]=sliderMultiplier
+        
 
     # Create an instance of OsuBeatmap using the parsed data
     return [OsuBeatmap(
@@ -528,10 +536,6 @@ def process_file(index, row):
             # Save the NumPy array to disk
             np.save(save_path, data_array)
             
-        
-        
-        
-        
             # Increment the progress counter in a thread-safe manner
             with progress_lock:
                 global progress_counter
