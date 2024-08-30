@@ -1,3 +1,5 @@
 2024-08-28 20:15:47,625 - Error processing row 82496: list index out of range
 2024-08-28 20:26:34,216 - Error processing row 82496: list index out of range
 2024-08-28 20:33:15,401 - Error processing row 82496: list index out of range
+2024-08-30 11:02:12,839 - Error processing row 5: setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (780,) + inhomogeneous part.
+2024-08-30 11:05:18,803 - Error processing row 5: setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (780,) + inhomogeneous part.

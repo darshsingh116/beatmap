@@ -9,8 +9,11 @@ def process_timing_data(data):
     np.set_printoptions(precision=10, suppress=True)
     # for d in data:
     #     print(d[-16:])
+    # print(data[0].shape)
 
     for array in data:
+        # if array[3] == 12 or array[3] == 8:
+        #     print(array)
         # print(array)
         # Extract the last 16 elements
         last_16_elements = array[-16:]
@@ -18,11 +21,6 @@ def process_timing_data(data):
         # Divide into uninherited and inherited timing points
         uninherited_points = last_16_elements[8:]
         inherited_points = last_16_elements[:8]
-
-
-        # # Convert lists to tuples for comparison
-        # uninherited_tuple = uninherited_points
-        # inherited_tuple = inherited_points
 
         # Modify the second value of inherited points
         inherited_points[1] = 0-float(inherited_points[1])
@@ -38,18 +36,93 @@ def process_timing_data(data):
 
         # Append uninherited timing points if different from previous
         if uninherited_str != prev_uninherited_str:
-            timingpoints.append(uninherited_str)
+            timingpoints.append(",".join(uninherited_str))
             prev_uninherited_str = uninherited_str
 
         # Append inherited timing points if different from previous
         # but only if uninherited and inherited are both different
         if inherited_str != prev_inherited_str:
-            timingpoints.append(inherited_str)
+            timingpoints.append(",".join(inherited_str))
             prev_inherited_str = inherited_str
 
     return timingpoints
 
 
+
+
+def process_hitobject_data(data):
+    hitobjects = []
+    prev_slider_val = 2 #if 2 then prev was no slider or slider ended
+    prev_slider_data = []
+    length = 0
+    for array in data:
+        # print(array[17:18])
+        # print(prev_slider_data)
+        hit_type = int(array[3])
+        # Convert hit_type to a binary string
+        binary_representation = bin(hit_type)[-4:]
+
+        # Check the last three bits
+        last_three_bits = binary_representation.zfill(3)  # Ensure it's always 3 bits long
+
+        # Find indices of '1' bits
+        indices_of_ones = [i for i, bit in enumerate(reversed(last_three_bits)) if bit == '1']
+        # print(indices_of_ones)
+
+        if 0 in indices_of_ones:
+            # Handle hit objects of type 1 or 4
+            # print("circle")
+            hitobjects.append(",".join([str(int(array[0])),str(int(array[1])),str(int(array[2])),str(int(array[3])),str(int(array[4])),f"{int(array[13])}:{int(array[14])}:{int(array[15])}:{int(array[16])}:"]))
+            
+        
+        elif 1 in indices_of_ones:
+            # Handle hit objects of type 2 or 6 (slider)
+            # print("slider")
+            if prev_slider_val == 2:
+                slider_type_char = "Z" #junk val
+                if int(array[5]) == 1:
+                    slider_type_char = "B"
+                elif int(array[5]) == 2:
+                    slider_type_char = "L"
+                elif int(array[5]) == 3:
+                    slider_type_char = "P"
+
+                length = array[9]
+                prev_slider_data = [str(int(array[0])),str(int(array[1])),str(int(array[2])),str(int(array[3])),str(int(array[4])),f"{slider_type_char}",str(int(array[8])),"sliderLen",f"{int(array[10])}",f"{int(array[11])}:{int(array[12])}",f"{int(array[13])}:{int(array[14])}:{int(array[15])}:{int(array[16])}:"]
+                prev_slider_val = int(array[17])
+            elif prev_slider_val == 0 and not (int(array[17]) == 2):
+                length += array[9]
+                prev_slider_data[5] = prev_slider_data[5] + f"|{int(array[6])}:{int(array[7])}" 
+                prev_slider_data[8] = prev_slider_data[8] + f"|{int(array[10])}"
+                prev_slider_data[9] = prev_slider_data[9] + f"|{int(array[11])}:{int(array[12])}"
+                #make more here
+                prev_slider_val = int(array[17])
+
+            elif (prev_slider_val == 1) or (int(array[17]) == 2):
+                length += array[9]
+                prev_slider_data[5] = prev_slider_data[5] + f"|{int(array[6])}:{int(array[7])}" 
+                prev_slider_data[8] = prev_slider_data[8] + f"|{int(array[10])}"
+                prev_slider_data[9] = prev_slider_data[9] + f"|{int(array[11])}:{int(array[12])}"
+                prev_slider_data[7] = str(length)
+                prev_slider_val = int(array[17])
+                # print(prev_slider_data)
+                if prev_slider_val == 2 :
+                    # print("here")
+                    #append to hitobjects
+                    hitobjects.append(",".join(prev_slider_data))
+                    # prev_slider_data = []
+                
+        
+        elif 3 in indices_of_ones:
+            # Handle hit objects of type 8 or 12
+            # print("spinner")
+            hitobjects.append(",".join([str(int(array[0])),str(int(array[1])),str(int(array[2])),str(int(array[3])),str(int(array[4])),str(int(array[18])),f"{int(array[13])}:{int(array[14])}:{int(array[15])}:{int(array[16])}:"]))
+
+        else:
+            # print(hit_type)
+            # print(hitobject)
+            raise ValueError("Anomoly where hit type is other tan 1,5,2,6,8,12 ... in makeBeatmap.py line 99.")  # Return as-is if no special handling    
+    return hitobjects
 
 
 def load_and_print_npy_data(df):
@@ -65,7 +138,10 @@ def load_and_print_npy_data(df):
             print(f"Loaded data from {folder_path}:")
             # print(data_array)
             timingpoint = np.array(process_timing_data(data_array))
-            print(timingpoint)
+            hitobjects = np.array(process_hitobject_data(data_array))
+            # print(timingpoint)
+            for h in hitobjects:
+                print(h)
         else:
             print(f"File {folder_path} does not exist.")
             return None

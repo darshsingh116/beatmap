@@ -138,7 +138,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart = parts[5].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]
+        parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]+[int(parts[2])]
         return [[parts+footerListWithTimingPointsData] ,uninherited_timingpointvar,inherited_timingpointvar]  # Length 11
     
     elif 1 in indices_of_ones:
@@ -160,7 +160,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart = parts[6].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4]),int(parts[5])]+ [0] * 7 +subpart+[0] + footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
+        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])]+ [0] * 8 +subpart+[0] +[int(parts[5])]+ footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
     
     else:
         # print(hit_type)
@@ -378,7 +378,7 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
             
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')] #+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),(float(parts[7])/num_points),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+(int(slider_duration_per_sliderpoint)*(i+1)))]
             new_segments.append(segment)
 
     elif slider_type == 'B' or slider_type == 'C':
@@ -391,7 +391,7 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
             
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),(float(parts[7])/num_points),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+(int(slider_duration_per_sliderpoint)*(i+1)))]
             new_segments.append(segment)
 
     elif slider_type == 'P':
@@ -431,7 +431,7 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
             
             # slider_point_toint_data = slider_points_data[i].split(':')
             slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),(int(parts[2])+int(float(slider_duration_per_sliderpoint/2)*i)),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),float(parts[7]),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]
+            segment = [int(new_x),int(new_y),(int(parts[2])+int(float(slider_duration_per_sliderpoint/2)*i)),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),(float(parts[7])/num_points),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+int(float(slider_duration_per_sliderpoint/2)*(i+1)))]
             new_segments.append(segment)
 
 
@@ -598,8 +598,8 @@ def load_osu_files_from_df(df):
     
     # Log summary of errors
     print(f"Total errors encountered: {error_count}")
-    for row in error_rows:
-        print(f"Error in row : {row}")
+    # for row in error_rows:
+    #     print(f"Error in row : {row}")
 
 
 def save_df_as_csv(df):
