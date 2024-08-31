@@ -71,7 +71,7 @@ class OsuBeatmap:
 
 
     
-def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited_timingpointvar: int, timing_points: List[str],sm:str) -> Tuple[List[str], int, int]:
+def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited_timingpointvar: int, last_inherited_timingpointvar: int, timing_points: List[str],sm:str) -> Tuple[List[str], int, int]:
     parts = hitobject.split(',')
     hit_type = int(parts[3])
     sm = float(sm)
@@ -91,15 +91,12 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     
     lastIndexFlag = False
     
-    if (float(timing_points[inherited_timingpointvar][1]) > 0) :
-        uninherited_timingpointvar = inherited_timingpointvar
-        # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
-        # inherited_timingpointvar += 1
     if inherited_timingpointvar+1 == len(timing_points):
         timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
     else:
         if int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
             while int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
+                last_inherited_timingpointvar = inherited_timingpointvar
                 inherited_timingpointvar += 1
                 if inherited_timingpointvar+1 == len(timing_points):
                     timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
@@ -109,14 +106,20 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         if not lastIndexFlag:
             if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
                 timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
+                last_inherited_timingpointvar = inherited_timingpointvar
                 inherited_timingpointvar += 1
             else:
                 if inherited_timingpointvar == 0:
                     timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
                     # raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
                 else:
-                    timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
-        
+                    if float(timing_points[inherited_timingpointvar][1]) < 0:
+                        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+                    else:
+                        if last_inherited_timingpointvar == -1:
+                            timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+                        else:
+                            timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
 
     #calc now
     # print(hitobject)
@@ -130,7 +133,7 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     timingpoint_for_this_hitobject_with_posVal[1] = str(abs(float(timingpoint_for_this_hitobject_with_posVal[1])))
 
     footerListWithTimingPointsData = [float(value) for value in timingpoint_for_this_hitobject_with_posVal] + [float(value) for value in uninherited_timingpoint_for_this_hitobject]
-
+    
     if 0 in indices_of_ones:
         # Handle hit objects of type 1 or 4
         if len(parts)==5:
@@ -139,7 +142,13 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart.pop()
         subpart = [int(i) for i in subpart]
         parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]+[int(parts[2])]
-        return [[parts+footerListWithTimingPointsData] ,uninherited_timingpointvar,inherited_timingpointvar]  # Length 11
+        if inherited_timingpointvar+1 < len(timing_points):
+            if (float(timing_points[inherited_timingpointvar+1][1]) > 0) :
+                uninherited_timingpointvar = inherited_timingpointvar+1
+                # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
+                last_inherited_timingpointvar = inherited_timingpointvar
+                inherited_timingpointvar += 1
+        return [[parts+footerListWithTimingPointsData] ,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]  # Length 11
     
     elif 1 in indices_of_ones:
         # Handle hit objects of type 2 or 6 (slider)
@@ -148,10 +157,23 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         beatlen=float(timing_points[uninherited_timingpointvar][1])
         svm = (100.0/abs(float(timingpoint_for_this_hitobject[1])))
         length = float(parts[7])
-        slider_duration_per_sliderpoint = (length / (sm * 100 * svm) * beatlen)
-        split_slider_list = split_slider(hitobject,slider_duration_per_sliderpoint,timingpoint_for_this_hitobject)
+        slider_duration_acc_to_len = (length / (sm * 100 * svm) * beatlen)
+        if timestamp == 2556:
+            print(slider_duration_acc_to_len)
+            print(beatlen)
+            print(sm)
+            print(timingpoint_for_this_hitobject)
+            print(svm)
+            print(length)
+        split_slider_list = split_slider(hitobject,slider_duration_acc_to_len,timingpoint_for_this_hitobject)
         split_slider_with_footer = [sublist+footerListWithTimingPointsData for sublist in split_slider_list]
-        return [split_slider_with_footer,uninherited_timingpointvar,inherited_timingpointvar]
+        if inherited_timingpointvar+1 < len(timing_points):
+            if (float(timing_points[inherited_timingpointvar+1][1]) > 0) :
+                uninherited_timingpointvar = inherited_timingpointvar+1
+                # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")\
+                last_inherited_timingpointvar = inherited_timingpointvar
+                inherited_timingpointvar += 1
+        return [split_slider_with_footer,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]
     
     elif 3 in indices_of_ones:
         # Handle hit objects of type 8 or 12
@@ -160,7 +182,13 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart = parts[6].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])]+ [0] * 8 +subpart+[0] +[int(parts[5])]+ footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar]  # Pad to length 11
+        if inherited_timingpointvar+1 < len(timing_points):
+            if (float(timing_points[inherited_timingpointvar+1][1]) > 0) :
+                uninherited_timingpointvar = inherited_timingpointvar+1
+                # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
+                last_inherited_timingpointvar = inherited_timingpointvar
+                inherited_timingpointvar += 1
+        return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])]+ [0] * 8 +subpart+[0] +[int(parts[5])]+ footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]  # Pad to length 11
     
     else:
         # print(hit_type)
@@ -178,11 +206,10 @@ def parse_osu_file(file_path) -> Tuple[OsuBeatmap , List[str]]:
         uninherited_timingpointvar = 0
         inherited_timingpointvar = 0
         sliderMultiplier = 0
+        last_inherited_timingpointvar = -1
         hyperParamFooter = ["","","","","","","","","",]
         # inherit data
         for line in file:
-            # print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            # print(timing_points)
             line = line.strip()
             if line.startswith('['):
                 # Handle section headers
@@ -190,7 +217,7 @@ def parse_osu_file(file_path) -> Tuple[OsuBeatmap , List[str]]:
                 continue
             
             if current_section == 'HitObjects' and line:
-                objs,uninherited_timingpointvar,inherited_timingpointvar = process_hitobject(line,uninherited_timingpointvar,inherited_timingpointvar,timing_points,sliderMultiplier)
+                objs,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar = process_hitobject(line,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar,timing_points,sliderMultiplier)
                 for l in objs:
                     hit_objects.append(l)
                 continue
@@ -317,7 +344,7 @@ def circle_point(center, radius, angle):
     )
 
 # Function to split slider into segments
-def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timingpoint_for_this_hitobject: List[str]):
+def split_slider(slider_data: str, slider_duration_acc_to_len: float,timingpoint_for_this_hitobject: List[str]):
     # print(slider_data)
     # Parse slider_data
     parts = slider_data.split(',')
@@ -367,31 +394,40 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
     subpart = [int(i) for i in subpart]
     if len(subpart) < 4:
         subpart = subpart + [0]*(4-len(subpart))
+
+    
     
     # Generate new segments based on slider type
     if slider_type == 'L':
-        # Linear interpolation
+        # Linear interpolation\
+        nodePerLen = num_points/int(parts[6])
+        slider_duration_per_sliderpoint = slider_duration_acc_to_len/nodePerLen
+        len_per_slider_point = float(parts[7])/nodePerLen
         for i in range(num_points):
             t = i / (num_points - 1)
             new_x = interpolate_linear(start_point[0], path_points[-1][0], t)
             new_y = interpolate_linear(start_point[1], path_points[-1][1], t)
-            
             # slider_point_toint_data = slider_points_data[i].split(':')
-            slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')] #+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),(float(parts[7])/num_points),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+(int(slider_duration_per_sliderpoint)*(i+1)))]
+            slider_point_toint_data = [int(j) for j in slider_points_data[i].split(':')] #+[int(i) for i in slider_points_data[i+1].split(':')]
+            
+            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),2,int(new_x),int(new_y),int(parts[6]),len_per_slider_point,int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+(int(slider_duration_per_sliderpoint)*(i+1)))]
             new_segments.append(segment)
 
     elif slider_type == 'B' or slider_type == 'C':
         # print(slider_data)
         # print(slider_points_data)
         # Bezier curve interpolation
+        nodePerLen = num_points/int(parts[6])
+        slider_duration_per_sliderpoint = slider_duration_acc_to_len/nodePerLen
+        len_per_slider_point = float(parts[7])/nodePerLen
         for i in range(num_points):
             t = i / (num_points - 1)
             new_x, new_y = bezier_point(t, path_points)
             
             # slider_point_toint_data = slider_points_data[i].split(':')
-            slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),(float(parts[7])/num_points),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+(int(slider_duration_per_sliderpoint)*(i+1)))]
+            slider_point_toint_data = [int(j) for j in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
+            
+            segment = [int(new_x),int(new_y),(int(parts[2])+(int(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),1,int(new_x),int(new_y),int(parts[6]),len_per_slider_point,int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+(int(slider_duration_per_sliderpoint)*(i+1)))]
             new_segments.append(segment)
 
     elif slider_type == 'P':
@@ -426,12 +462,16 @@ def split_slider(slider_data: str, slider_duration_per_sliderpoint: float,timing
         # print(slider_points)
         # print(path_points)
         num_points = len(slider_points)
+        nodePerLen = num_points/int(parts[6])
+        slider_duration_per_sliderpoint = slider_duration_acc_to_len/nodePerLen
+        len_per_slider_point = float(parts[7])/nodePerLen
         for i in range(num_points):
             new_x, new_y = (path_points[i][0],path_points[i][1])
             
             # slider_point_toint_data = slider_points_data[i].split(':')
-            slider_point_toint_data = [int(i) for i in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
-            segment = [int(new_x),int(new_y),(int(parts[2])+int(float(slider_duration_per_sliderpoint/2)*i)),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),(float(parts[7])/num_points),int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+int(float(slider_duration_per_sliderpoint/2)*(i+1)))]
+            slider_point_toint_data = [int(j) for j in slider_points_data[i].split(':')]#+[int(i) for i in slider_points_data[i+1].split(':')]
+
+            segment = [int(new_x),int(new_y),(int(parts[2])+int(float(slider_duration_per_sliderpoint)*i)),int(parts[3]),int(parts[4]),3,int(new_x),int(new_y),int(parts[6]),len_per_slider_point,int(slider_points[i])]+slider_point_toint_data+subpart+[0 if i == 0 else 2 if i == num_points - 1 else 1]+[(int(parts[2])+int(float(slider_duration_per_sliderpoint)*(i+1)))]
             new_segments.append(segment)
 
 
@@ -551,23 +591,19 @@ def process_file(index, row):
         logging.error(f"Error processing row {index}: {e}")
         return [False,row]
 
-# def load_osu_files_from_df(df):
-#     new_df = pd.DataFrame()
-#     os.makedirs("processed-beatmaps", exist_ok=True)
-
-#     with ThreadPoolExecutor() as executor:
-#         futures = [executor.submit(process_file, index, row) for index, row in df.iterrows()]
-#         results = []
-        
-#         for future in as_completed(futures):
-#             result = future.result()
-#             if result is not None:
-#                 results.append(result)
+def load_osu_files_from_df_notparallel(df):
+    new_df = pd.DataFrame()
+    results = []
+    os.makedirs("processed-beatmaps", exist_ok=True)
+    for index, row in df.iterrows():
+        result = process_file(index,row)
+        if result is not None:
+                results.append(result)
     
-#     new_df = pd.DataFrame(results)
+    new_df = pd.DataFrame(results)
     
-#     # Save metadata also for retrieval later
-#     save_df_as_csv(new_df)
+    # Save metadata also for retrieval later
+    save_df_as_csv(new_df)
 
 import logging
 # Set up logging
