@@ -164,3 +164,4 @@ cython_debug/
 /processed-audio
 /processed-beatmaps
 /processed-metadata
+/aiOutput

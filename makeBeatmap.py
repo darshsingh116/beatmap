@@ -27,12 +27,16 @@ def process_timing_data(data):
 
         # Convert elements to strings
         # Convert points to lists of strings
-        uninherited_str_list = [str(value) for value in uninherited_points]
-        inherited_str_list = [str(value) for value in inherited_points]
-
+        if uninherited_points[0] < 0:
+            uninherited_points[0] = str(inherited_points[0])
+        uninherited_str_list = [str(int(value)) for value in uninherited_points]
+        inherited_str_list = [str(int(value)) for value in inherited_points]
+        inherited_str_list[1] =  str(inherited_points[1])
+        uninherited_str_list[1] =  str(uninherited_points[1])
+        
         # Join the lists into comma-separated strings
-        uninherited_str = ",".join(uninherited_str_list)
-        inherited_str = ",".join(inherited_str_list)
+        uninherited_str = uninherited_str_list
+        inherited_str = inherited_str_list
 
         # Append uninherited timing points if different from previous
         if uninherited_str != prev_uninherited_str:
@@ -129,7 +133,6 @@ def load_and_print_npy_data(df):
     for index, row in df.iterrows():
         # Construct the full path to the .npy file
         folder_path = os.path.join("processed-beatmaps", f"{row['audio']}-b.npy")
-        
         # Load the .npy file into a NumPy array
         if os.path.exists(folder_path):
             data_array = np.load(folder_path)
@@ -140,8 +143,46 @@ def load_and_print_npy_data(df):
             timingpoint = np.array(process_timing_data(data_array))
             hitobjects = np.array(process_hitobject_data(data_array))
             # print(timingpoint)
-            for h in hitobjects:
-                print(h)
+            # for h in hitobjects:
+            #     print(h)
+            # for t in timingpoint:
+            #     print(t)
+            # Define file name
+
+            # Define folder and file name
+            folder_name = 'aiOutput'
+            os.makedirs(folder_name, exist_ok=True)
+            filename = os.path.join(folder_name, f"{row["title"]}.osu")
+
+            # Open the file in write mode
+            with open(filename, 'w') as file:
+                # Write the [General] section
+                file.write("[General]\n")
+                file.write(f"AudioFilename:audio.mp3\n")
+                file.write("\n")  # Leave a blank line
+                
+                # Write the [Difficulty] section
+                file.write("[Difficulty]\n")
+                file.write(f"HPDrainRate:{row['HPDrainRate']}\n")
+                file.write(f"CircleSize:{row['CircleSize']}\n")
+                file.write(f"OverallDifficulty:{row['OverallDifficulty']}\n")
+                file.write(f"ApproachRate:{row['ApproachRate']}\n")
+                file.write(f"SliderMultiplier:{row['SliderMultiplier']}\n")
+                file.write(f"SliderTickRate:{row['SliderTickRate']}\n")
+                file.write("\n")  # Leave a blank line
+                
+                # Write the [TimingPoints] section
+                file.write("[TimingPoints]\n")
+                for point in timingpoint:
+                    file.write(f"{point}\n")
+                file.write("\n")  # Leave a blank line
+                
+                # Write the [HitObjects] section
+                file.write("[HitObjects]\n")
+                for obj in hitobjects:
+                    file.write(f"{obj}\n")
+
+            print(f"File '{filename}' has been created.")
         else:
             print(f"File {folder_path} does not exist.")
             return None
