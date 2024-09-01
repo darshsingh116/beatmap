@@ -98,10 +98,10 @@ def load_all_beatmaps_and_audios_from_df(df):
 
 
 
-def process_audio_and_beatmap_for_model(audio_filename):
+def process_audio_and_beatmap_for_model_single(metadata):
     # Define paths to the beatmap and audio files
-    beatmap_path = os.path.join(project_path, "processed-beatmaps", f"{audio_filename}-b.npy")
-    audio_path = os.path.join(project_path, "processed-audio", f"{audio_filename}-a.npy")
+    beatmap_path = os.path.join(project_path, "processed-beatmaps", f"{metadata["audio"]}-b.npy")
+    audio_path = os.path.join(project_path, "processed-audio", f"{metadata["audio"]}-a.npy")
 
     # Load beatmap and audio data if files exist
     if not os.path.exists(beatmap_path):
@@ -127,6 +127,8 @@ def process_audio_and_beatmap_for_model(audio_filename):
     num_chunks = len(audio_data)
     beatmap_itr = 0
 
+    input_footer = [float(metadata["bpm"]),float(metadata["total_length"])]+[float(x) for x in metadata[-9:]]
+
     for i in range(num_chunks):
         if beatmap_itr > 0:
             if beatmap_data[beatmap_itr][2] < beatmap_data[beatmap_itr-1][2]:
@@ -140,8 +142,11 @@ def process_audio_and_beatmap_for_model(audio_filename):
                 beatmap_itr += 1
 
 
-        # Add timestamp to the start of the audio chunk
-        audio_chunk = np.insert(audio_data[i], 0, timestamp)
+        # Add timestamp to the start of the audio chunk and footer on back
+        audio_part = np.array(audio_data[i])
+        audio_part = audio_part.flatten()
+        audio_part = np.insert(audio_part,0,timestamp)
+        audio_chunk = np.concatenate((audio_part, input_footer))
         processed_audio.append(audio_chunk)
 
         # Check for the timestamp of the current beatmap data
@@ -168,4 +173,44 @@ def process_audio_and_beatmap_for_model(audio_filename):
 
         processed_beatmap.append(beatmap_chunk)
 
-    return processed_audio, processed_beatmap
+    return np.array(processed_audio), np.array(processed_beatmap)
+
+
+def process_audio_and_beatmap_for_model_all(df,chunk_size=2000):
+    # Initialize empty arrays to store processed data
+    processed_audio_list = []
+    processed_beatmap_list = []
+
+    save_path = os.path.join(project_path,"model-processed-data")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    itr=0
+    # Iterate through the DataFrame
+    for index, row in df.iterrows():
+        processed_audio, processed_beatmap = process_audio_and_beatmap_for_model_single(row)
+
+        # Append the processed data to lists
+        processed_audio_list.append(processed_audio)
+        processed_beatmap_list.append(processed_beatmap)
+
+        # Save periodically to avoid memory overflow
+        if (itr + 1) % chunk_size == 0:
+            # Convert lists to numpy arrays
+            audio_array = np.array(processed_audio_list)
+            beatmap_array = np.array(processed_beatmap_list)
+
+            # Save to disk
+            np.save(f'{save_path}/processed_audio_chunk_{itr//chunk_size}.npy', audio_array)
+            np.save(f'{save_path}/processed_beatmap_chunk_{itr//chunk_size}.npy', beatmap_array)
+
+            # Clear lists to free up memory
+            processed_audio_list = []
+            processed_beatmap_list = []
+
+        itr+=1
+    # Save remaining data
+    if processed_audio_list and processed_beatmap_list:
+        audio_array = np.array(processed_audio_list)
+        beatmap_array = np.array(processed_beatmap_list)
+        np.save(f'{save_path}/processed_audio_chunk_final.npy', audio_array)
+        np.save(f'{save_path}/processed_beatmap_chunk_final.npy', beatmap_array)
