@@ -71,7 +71,7 @@ def process_audio(row, processed_dir):
         
         # Save the MFCC features as a .npy file
         np.save(save_path, chunks)
-        print(f"Saved: {save_path}")
+        # print(f"Saved: {save_path}")
     except:
         print("error")
 

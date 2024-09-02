@@ -92,22 +92,52 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     lastIndexFlag = False
     
     if inherited_timingpointvar+1 == len(timing_points):
-        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+        if float(timing_points[inherited_timingpointvar][1])<0:
+            timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+        else:
+            timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
     else:
         if int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
             while int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
-                last_inherited_timingpointvar = inherited_timingpointvar
+                if float(timing_points[inherited_timingpointvar][1])<0:
+                    last_inherited_timingpointvar = inherited_timingpointvar
                 inherited_timingpointvar += 1
                 if inherited_timingpointvar+1 == len(timing_points):
-                    timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+                    if int(round(float(timing_points[inherited_timingpointvar][1])))<0:
+                        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+                    else:
+                        timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
                     lastIndexFlag = True
                     break
+            if not lastIndexFlag :
+                if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
+                    if float(timing_points[inherited_timingpointvar+1][1])>0:
+                        uninherited_timingpointvar = inherited_timingpointvar+1
+                    if inherited_timingpointvar+2 < len(timing_points):
+                        if float(timing_points[inherited_timingpointvar+2][1])<0 :
+                            timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+2]
+                            if float(timing_points[inherited_timingpointvar+1][1])<0 :
+                                last_inherited_timingpointvar = inherited_timingpointvar+1
+                        else:
+                            timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+                        inherited_timingpointvar += 1
+                        if inherited_timingpointvar+1 == len(timing_points):
+                            lastIndexFlag = True
+                else:
+                    timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
 
-        if not lastIndexFlag:
+        elif not lastIndexFlag :
             if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
-                timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
-                last_inherited_timingpointvar = inherited_timingpointvar
-                inherited_timingpointvar += 1
+                if float(timing_points[inherited_timingpointvar+1][1])<0:
+                    timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
+                    if float(timing_points[inherited_timingpointvar][1])<0:
+                        last_inherited_timingpointvar = inherited_timingpointvar
+                    inherited_timingpointvar += 1
+                elif (last_inherited_timingpointvar != -1):
+                    timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+                else:
+                    timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+                
             else:
                 if inherited_timingpointvar == 0:
                     timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
@@ -143,10 +173,11 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart = [int(i) for i in subpart]
         parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]+[int(parts[2])]
         if inherited_timingpointvar+1 < len(timing_points):
-            if (float(timing_points[inherited_timingpointvar+1][1]) > 0) :
+            if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
                 uninherited_timingpointvar = inherited_timingpointvar+1
                 # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
-                last_inherited_timingpointvar = inherited_timingpointvar
+                if float(timing_points[inherited_timingpointvar][1])<0:
+                    last_inherited_timingpointvar = inherited_timingpointvar
                 inherited_timingpointvar += 1
         return [[parts+footerListWithTimingPointsData] ,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]  # Length 11
     
@@ -157,21 +188,15 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         beatlen=float(timing_points[uninherited_timingpointvar][1])
         svm = (100.0/abs(float(timingpoint_for_this_hitobject[1])))
         length = float(parts[7])
-        slider_duration_acc_to_len = (length / (sm * 100 * svm) * beatlen)
-        if timestamp == 2556:
-            print(slider_duration_acc_to_len)
-            print(beatlen)
-            print(sm)
-            print(timingpoint_for_this_hitobject)
-            print(svm)
-            print(length)
+        slider_duration_acc_to_len = ((length * beatlen)/(sm * 100 * svm))
         split_slider_list = split_slider(hitobject,slider_duration_acc_to_len,timingpoint_for_this_hitobject)
         split_slider_with_footer = [sublist+footerListWithTimingPointsData for sublist in split_slider_list]
         if inherited_timingpointvar+1 < len(timing_points):
-            if (float(timing_points[inherited_timingpointvar+1][1]) > 0) :
+            if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
                 uninherited_timingpointvar = inherited_timingpointvar+1
                 # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")\
-                last_inherited_timingpointvar = inherited_timingpointvar
+                if float(timing_points[inherited_timingpointvar][1])<0:    
+                    last_inherited_timingpointvar = inherited_timingpointvar
                 inherited_timingpointvar += 1
         return [split_slider_with_footer,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]
     
@@ -183,10 +208,11 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart.pop()
         subpart = [int(i) for i in subpart]
         if inherited_timingpointvar+1 < len(timing_points):
-            if (float(timing_points[inherited_timingpointvar+1][1]) > 0) :
+            if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
                 uninherited_timingpointvar = inherited_timingpointvar+1
                 # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
-                last_inherited_timingpointvar = inherited_timingpointvar
+                if float(timing_points[inherited_timingpointvar][1])<0:    
+                    last_inherited_timingpointvar = inherited_timingpointvar
                 inherited_timingpointvar += 1
         return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])]+ [0] * 8 +subpart+[0] +[int(parts[5])]+ footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]  # Pad to length 11
     
@@ -607,7 +633,7 @@ def load_osu_files_from_df_notparallel(df):
 
 import logging
 # Set up logging
-logging.basicConfig(filename='error_log.txt', level=logging.ERROR, format='%(asctime)s - %(message)s')
+logging.basicConfig(filename='error_log.txt', level=logging.DEBUG, format='%(asctime)s - %(message)s')
 
 def load_osu_files_from_df(df):
     os.makedirs("processed-beatmaps", exist_ok=True)

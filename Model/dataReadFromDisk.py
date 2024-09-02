@@ -132,7 +132,7 @@ def process_audio_and_beatmap_for_model_single(metadata):
     for i in range(num_chunks):
         if beatmap_itr > 0:
             if beatmap_data[beatmap_itr][2] < beatmap_data[beatmap_itr-1][2]:
-                raise ValueError(f"PARSING ERROR SOMEWHERE : Beatmap timestamp {beatmap_data[beatmap_itr][2]}ms is smaller than previous.")
+                raise ValueError(f"PARSING ERROR SOMEWHERE : Beatmap timestamp {beatmap_data[beatmap_itr][2]}ms is smaller than previous which is{beatmap_data[beatmap_itr-1][2]} {beatmap_data[beatmap_itr-2][2]} {beatmap_data[beatmap_itr-3][2]}in map {metadata["folder"]}/{metadata["audio"]}.osu")
         timestamp = i * 50  # Calculate the timestamp for this chunk in ms
         if len(processed_beatmap) > 1:
             if (beatmap_data[beatmap_itr][2]- beatmap_data[beatmap_itr-1][2]) < 50:
@@ -176,7 +176,7 @@ def process_audio_and_beatmap_for_model_single(metadata):
     return np.array(processed_audio), np.array(processed_beatmap)
 
 
-def process_audio_and_beatmap_for_model_all(df,chunk_size=2000):
+def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
     # Initialize empty arrays to store processed data
     processed_audio_list = []
     processed_beatmap_list = []
