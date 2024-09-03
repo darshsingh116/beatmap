@@ -22,7 +22,7 @@ def brew():
 
     # Preprocess and store all audio data tobe trained
     
-    # preprocess_and_save_audio_in_parallel(df)
+    preprocess_and_save_audio_in_parallel(df)
     # preprocess_and_save_audio(df)
 
     # End the timer (Toc)

@@ -90,72 +90,99 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
     timingpoint_for_this_hitobject = []
     
     lastIndexFlag = False
-    
-    if inherited_timingpointvar+1 == len(timing_points):
-        if float(timing_points[inherited_timingpointvar][1])<0:
-            timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
-        else:
-            timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
-    else:
-        if int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
-            while int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
-                if float(timing_points[inherited_timingpointvar][1])<0:
-                    last_inherited_timingpointvar = inherited_timingpointvar
-                inherited_timingpointvar += 1
-                if inherited_timingpointvar+1 == len(timing_points):
-                    if int(round(float(timing_points[inherited_timingpointvar][1])))<0:
-                        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
-                    else:
-                        timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
-                    lastIndexFlag = True
-                    break
-            if not lastIndexFlag :
-                if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
-                    if float(timing_points[inherited_timingpointvar+1][1])>0:
-                        uninherited_timingpointvar = inherited_timingpointvar+1
-                    if inherited_timingpointvar+2 < len(timing_points):
-                        if float(timing_points[inherited_timingpointvar+2][1])<0 :
-                            timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+2]
-                            if float(timing_points[inherited_timingpointvar+1][1])<0 :
-                                last_inherited_timingpointvar = inherited_timingpointvar+1
-                        else:
-                            timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
-                        inherited_timingpointvar += 1
-                        if inherited_timingpointvar+1 == len(timing_points):
-                            lastIndexFlag = True
-                else:
-                    timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
 
-        elif not lastIndexFlag :
-            if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
-                if float(timing_points[inherited_timingpointvar+1][1])<0:
-                    timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
-                    if float(timing_points[inherited_timingpointvar][1])<0:
-                        last_inherited_timingpointvar = inherited_timingpointvar
-                    inherited_timingpointvar += 1
-                elif (last_inherited_timingpointvar != -1):
-                    timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
-                else:
-                    timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+    uninherited_temp_ptr = inherited_timingpointvar
+    while (int(round(float(timing_points[uninherited_temp_ptr][0]))) <= timestamp):
+        if float(timing_points[uninherited_temp_ptr][1])>0:
+            uninherited_timingpointvar = uninherited_temp_ptr
+        uninherited_temp_ptr += 1
+        if uninherited_temp_ptr == len(timing_points):
+            break
+    
+    inherited_timingpoint_temp_var = inherited_timingpointvar
+    while (int(round(float(timing_points[inherited_timingpoint_temp_var][0]))) <= timestamp):
+        if float(timing_points[inherited_timingpoint_temp_var][1])<0:
+            last_inherited_timingpointvar = inherited_timingpointvar
+            inherited_timingpointvar = inherited_timingpoint_temp_var
+        inherited_timingpoint_temp_var += 1
+        if inherited_timingpoint_temp_var == len(timing_points):
+            break
+
+    uninherited_timingpoint_for_this_hitobject = timing_points[uninherited_timingpointvar]
+    if last_inherited_timingpointvar == -1:
+        timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+    elif inherited_timingpointvar == len(timing_points):
+         timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+    elif float(timing_points[inherited_timingpointvar][1])<0:
+        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+    else:
+        timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+
+    # if inherited_timingpointvar+1 == len(timing_points):
+    #     if float(timing_points[inherited_timingpointvar][1])<0:
+    #         timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+    #     else:
+    #         timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+    # else:
+    #     if int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
+    #         while int(round(float(timing_points[inherited_timingpointvar+1][0]))) < timestamp:
+    #             if float(timing_points[inherited_timingpointvar][1])<0:
+    #                 last_inherited_timingpointvar = inherited_timingpointvar
+    #             inherited_timingpointvar += 1
+    #             if inherited_timingpointvar+1 == len(timing_points):
+    #                 if int(round(float(timing_points[inherited_timingpointvar][1])))<0:
+    #                     timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+    #                 else:
+    #                     timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+    #                 lastIndexFlag = True
+    #                 break
+    #         if not lastIndexFlag :
+    #             if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
+    #                 if float(timing_points[inherited_timingpointvar+1][1])>0:
+    #                     uninherited_timingpointvar = inherited_timingpointvar+1
+    #                 if inherited_timingpointvar+2 < len(timing_points):
+    #                     if float(timing_points[inherited_timingpointvar+2][1])<0 :
+    #                         timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+2]
+    #                         if float(timing_points[inherited_timingpointvar+1][1])<0 :
+    #                             last_inherited_timingpointvar = inherited_timingpointvar+1
+    #                     else:
+    #                         timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+    #                     inherited_timingpointvar += 1
+    #                     if inherited_timingpointvar+1 == len(timing_points):
+    #                         lastIndexFlag = True
+    #             else:
+    #                 timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+
+    #     elif not lastIndexFlag :
+    #         if int(round(float(timing_points[inherited_timingpointvar+1][0]))) == timestamp:
+    #             if float(timing_points[inherited_timingpointvar+1][1])<0:
+    #                 timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar+1]
+    #                 if float(timing_points[inherited_timingpointvar][1])<0:
+    #                     last_inherited_timingpointvar = inherited_timingpointvar
+    #                 inherited_timingpointvar += 1
+    #             elif (last_inherited_timingpointvar != -1):
+    #                 timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+    #             else:
+    #                 timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
                 
-            else:
-                if inherited_timingpointvar == 0:
-                    timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
-                    # raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
-                else:
-                    if float(timing_points[inherited_timingpointvar][1]) < 0:
-                        timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
-                    else:
-                        if last_inherited_timingpointvar == -1:
-                            timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
-                        else:
-                            timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
+    #         else:
+    #             if inherited_timingpointvar == 0:
+    #                 timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+    #                 # raise ValueError("Anomoly where starting ob dont have a timing point ... in beatmap.py line 79.")
+    #             else:
+    #                 if float(timing_points[inherited_timingpointvar][1]) < 0:
+    #                     timingpoint_for_this_hitobject = timing_points[inherited_timingpointvar]
+    #                 else:
+    #                     if last_inherited_timingpointvar == -1:
+    #                         timingpoint_for_this_hitobject = [timestamp,-100,0,0,0,0,0,0]
+    #                     else:
+    #                         timingpoint_for_this_hitobject = timing_points[last_inherited_timingpointvar]
 
     #calc now
     # print(hitobject)
     # print(timingpoint_for_this_hitobject)
 
-    uninherited_timingpoint_for_this_hitobject = timing_points[uninherited_timingpointvar]
+    # uninherited_timingpoint_for_this_hitobject = timing_points[uninherited_timingpointvar]
     
     # print(uninherited_timingpoint_for_this_hitobject)
     # timingpoint_for_this_hitobject[1] = str(abs(float(timingpoint_for_this_hitobject[1])))
@@ -172,13 +199,13 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart.pop()
         subpart = [int(i) for i in subpart]
         parts = [int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])] + [0] * 8 + subpart + [0]+[int(parts[2])]
-        if inherited_timingpointvar+1 < len(timing_points):
-            if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
-                uninherited_timingpointvar = inherited_timingpointvar+1
-                # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
-                if float(timing_points[inherited_timingpointvar][1])<0:
-                    last_inherited_timingpointvar = inherited_timingpointvar
-                inherited_timingpointvar += 1
+        # if inherited_timingpointvar+1 < len(timing_points):
+        #     if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
+        #         uninherited_timingpointvar = inherited_timingpointvar+1
+        #         # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
+        #         if float(timing_points[inherited_timingpointvar][1])<0:
+        #             last_inherited_timingpointvar = inherited_timingpointvar
+        #         inherited_timingpointvar += 1
         return [[parts+footerListWithTimingPointsData] ,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]  # Length 11
     
     elif 1 in indices_of_ones:
@@ -191,13 +218,13 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         slider_duration_acc_to_len = ((length * beatlen)/(sm * 100 * svm))
         split_slider_list = split_slider(hitobject,slider_duration_acc_to_len,timingpoint_for_this_hitobject)
         split_slider_with_footer = [sublist+footerListWithTimingPointsData for sublist in split_slider_list]
-        if inherited_timingpointvar+1 < len(timing_points):
-            if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
-                uninherited_timingpointvar = inherited_timingpointvar+1
-                # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")\
-                if float(timing_points[inherited_timingpointvar][1])<0:    
-                    last_inherited_timingpointvar = inherited_timingpointvar
-                inherited_timingpointvar += 1
+        # if inherited_timingpointvar+1 < len(timing_points):
+        #     if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
+        #         uninherited_timingpointvar = inherited_timingpointvar+1
+        #         # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")\
+        #         if float(timing_points[inherited_timingpointvar][1])<0:    
+        #             last_inherited_timingpointvar = inherited_timingpointvar
+        #         inherited_timingpointvar += 1
         return [split_slider_with_footer,uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]
     
     elif 3 in indices_of_ones:
@@ -207,13 +234,13 @@ def process_hitobject(hitobject: str, uninherited_timingpointvar: int, inherited
         subpart = parts[6].split(":")
         subpart.pop()
         subpart = [int(i) for i in subpart]
-        if inherited_timingpointvar+1 < len(timing_points):
-            if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
-                uninherited_timingpointvar = inherited_timingpointvar+1
-                # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
-                if float(timing_points[inherited_timingpointvar][1])<0:    
-                    last_inherited_timingpointvar = inherited_timingpointvar
-                inherited_timingpointvar += 1
+        # if inherited_timingpointvar+1 < len(timing_points):
+        #     if ((float(timing_points[inherited_timingpointvar+1][1]) > 0)) and int(round(float(timing_points[inherited_timingpointvar+1][0]))) <= timestamp:
+        #         uninherited_timingpointvar = inherited_timingpointvar+1
+        #         # print(f"UPDATED {float(timing_points[inherited_timingpointvar][1])}")
+        #         if float(timing_points[inherited_timingpointvar][1])<0:    
+        #             last_inherited_timingpointvar = inherited_timingpointvar
+        #         inherited_timingpointvar += 1
         return [[[int(parts[0]),int(parts[1]),int(parts[2]),int(parts[3]),int(parts[4])]+ [0] * 8 +subpart+[0] +[int(parts[5])]+ footerListWithTimingPointsData],uninherited_timingpointvar,inherited_timingpointvar,last_inherited_timingpointvar]  # Pad to length 11
     
     else:

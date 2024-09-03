@@ -1,4 +1,5 @@
 import os
+import tensorflow as tf
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
@@ -100,8 +101,8 @@ def load_all_beatmaps_and_audios_from_df(df):
 
 def process_audio_and_beatmap_for_model_single(metadata):
     # Define paths to the beatmap and audio files
-    beatmap_path = os.path.join(project_path, "processed-beatmaps", f"{metadata["audio"]}-b.npy")
-    audio_path = os.path.join(project_path, "processed-audio", f"{metadata["audio"]}-a.npy")
+    beatmap_path = os.path.join(project_path, "processed-beatmaps", f"{metadata['audio']}-b.npy")
+    audio_path = os.path.join(project_path, "processed-audio", f"{metadata['audio']}-a.npy")
 
     # Load beatmap and audio data if files exist
     if not os.path.exists(beatmap_path):
@@ -123,23 +124,29 @@ def process_audio_and_beatmap_for_model_single(metadata):
     processed_audio = []
     processed_beatmap = []
 
-    # Iterate over each timeframe (100ms chunks with 50ms overlap)
+    # Iterate over each timeframe (20ms chunks with 10ms overlap)
     num_chunks = len(audio_data)
     beatmap_itr = 0
 
     input_footer = [float(metadata["bpm"]),float(metadata["total_length"])]+[float(x) for x in metadata[-9:]]
 
     for i in range(num_chunks):
-        if beatmap_itr > 0:
+        # fix_under_ten_ms = False
+        if (beatmap_itr > 0) and beatmap_itr < len(beatmap_data):
             if beatmap_data[beatmap_itr][2] < beatmap_data[beatmap_itr-1][2]:
-                raise ValueError(f"PARSING ERROR SOMEWHERE : Beatmap timestamp {beatmap_data[beatmap_itr][2]}ms is smaller than previous which is{beatmap_data[beatmap_itr-1][2]} {beatmap_data[beatmap_itr-2][2]} {beatmap_data[beatmap_itr-3][2]}in map {metadata["folder"]}/{metadata["audio"]}.osu")
-        timestamp = i * 50  # Calculate the timestamp for this chunk in ms
+                raise ValueError(f"PARSING ERROR SOMEWHERE : Beatmap timestamp {beatmap_data[beatmap_itr][2]}ms is smaller than previous which is{beatmap_data[beatmap_itr-1][2]} in map {metadata['folder']}/{metadata['audio']}.osu")
+        timestamp = i * 10  # Calculate the timestamp for this chunk in ms
         if len(processed_beatmap) > 1:
-            if (beatmap_data[beatmap_itr][2]- beatmap_data[beatmap_itr-1][2]) < 50:
+            if ((beatmap_data[beatmap_itr][2]- beatmap_data[beatmap_itr-1][2]) < 10) or (timestamp > beatmap_data[beatmap_itr][2]):
                 if np.array_equal(processed_beatmap[-2], np.zeros_like(beatmap_data[0])):
                     processed_beatmap[-2] = processed_beatmap[-1]
                     processed_beatmap[-1] = beatmap_data[beatmap_itr]
-                beatmap_itr += 1
+                    # fix_under_ten_ms = True
+                    beatmap_itr += 1
+                else:
+                    a = (beatmap_data[beatmap_itr][2]- beatmap_data[beatmap_itr-1][2]) < 10
+                    b = (timestamp >= beatmap_data[beatmap_itr][2])
+                    raise  ValueError(f"Error on line 146 dataReadFromDisk.py Beatmap timestamp {beatmap_data[beatmap_itr][2]}ms in map {metadata['folder']}/{metadata['audio']}.osu {a} or {b}")
 
 
         # Add timestamp to the start of the audio chunk and footer on back
@@ -160,10 +167,10 @@ def process_audio_and_beatmap_for_model_single(metadata):
                 #     beatmap_chunk = beatmap_data[beatmap_itr]
                 #     beatmap_itr += 1
                 # else:
-                raise ValueError(f"Audio timestamp {timestamp}ms has overtaken beatmap timestamp {beatmap_timestamp}ms.")
+                raise ValueError(f"Audio timestamp {timestamp}ms has overtaken beatmap timestamp {beatmap_timestamp}ms in map {metadata['folder']}/{metadata['audio']}.osu")
 
-            # Find the corresponding beatmap data within the 50ms window
-            elif timestamp <= beatmap_timestamp < (timestamp + 50):
+            # Find the corresponding beatmap data within the 10ms window
+            elif timestamp <= beatmap_timestamp < (timestamp + 10):
                 beatmap_chunk = beatmap_data[beatmap_itr]
                 beatmap_itr += 1  # Move to the next beatmap entry
             else:
@@ -171,10 +178,36 @@ def process_audio_and_beatmap_for_model_single(metadata):
         else:
             beatmap_chunk = np.zeros_like(beatmap_data[0])
 
+
+        # if not fix_under_ten_ms:
         processed_beatmap.append(beatmap_chunk)
 
     return np.array(processed_audio), np.array(processed_beatmap)
 
+def data_generator(processed_audio_list,processed_beatmap_list):
+        for audio, beatmap in zip(processed_audio_list, processed_beatmap_list):
+            yield (tf.convert_to_tensor(audio, dtype=tf.float32),
+                    tf.convert_to_tensor(beatmap, dtype=tf.float32))
+
+
+def create_dataset(processed_audio_list, processed_beatmap_list):
+    # Generator function defined inside create_dataset
+    def data_generator():
+        for audio, beatmap in zip(processed_audio_list, processed_beatmap_list):
+            yield (tf.convert_to_tensor(audio, dtype=tf.float32),
+                    tf.convert_to_tensor(beatmap, dtype=tf.float32))
+
+    # Create TensorFlow dataset
+    dataset = tf.data.Dataset.from_generator(
+        data_generator,
+        output_signature=(
+            tf.TensorSpec(shape=[None, 155], dtype=tf.float32),  # Variable length sequence with feature dimension 155
+            tf.TensorSpec(shape=[None, 35], dtype=tf.float32)    # Variable length sequence with feature dimension 35
+        )
+    )
+    
+
+    return dataset
 
 def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
     # Initialize empty arrays to store processed data
@@ -195,13 +228,36 @@ def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
 
         # Save periodically to avoid memory overflow
         if (itr + 1) % chunk_size == 0:
-            # Convert lists to numpy arrays
-            audio_array = np.array(processed_audio_list)
-            beatmap_array = np.array(processed_beatmap_list)
+            
+            # # Convert lists to numpy arrays
+            # audio_array = np.array(processed_audio_list)
+            # beatmap_array = np.array(processed_beatmap_list)
 
-            # Save to disk
-            np.save(f'{save_path}/processed_audio_chunk_{itr//chunk_size}.npy', audio_array)
-            np.save(f'{save_path}/processed_beatmap_chunk_{itr//chunk_size}.npy', beatmap_array)
+            # # Save to disk
+            # np.save(f'{save_path}/processed_audio_chunk_{itr//chunk_size}.npy', audio_array)
+            # np.save(f'{save_path}/processed_beatmap_chunk_{itr//chunk_size}.npy', beatmap_array)
+            # Example data
+
+            input_data = [np.array(song) for song in processed_audio_list]
+            output_data = [np.array(song) for song in processed_beatmap_list]
+
+            # Create a TensorFlow dataset
+            dataset = tf.data.Dataset.from_tensor_slices((input_data, output_data))
+            dataset = dataset.batch(1)  # Batch size of 1 for demonstration
+
+            # Custom filename and extension
+            filename = f"processed_dataset_{itr//chunk_size}"
+            # extension = ".tfdata"  # Custom extension
+
+            # # Define the save path (just the directory part)
+            save_path = os.path.join(save_path, filename)
+
+            # Ensure the directory exists
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+
+            # Save the dataset
+            tf.data.experimental.save(dataset, save_path)
 
             # Clear lists to free up memory
             processed_audio_list = []
@@ -210,7 +266,41 @@ def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
         itr+=1
     # Save remaining data
     if processed_audio_list and processed_beatmap_list:
-        audio_array = np.array(processed_audio_list)
-        beatmap_array = np.array(processed_beatmap_list)
-        np.save(f'{save_path}/processed_audio_chunk_final.npy', audio_array)
-        np.save(f'{save_path}/processed_beatmap_chunk_final.npy', beatmap_array)
+        
+        # audio_array = np.array(processed_audio_list)
+        # beatmap_array = np.array(processed_beatmap_list)
+        # np.save(f'{save_path}/processed_audio_chunk_final.npy', audio_array)
+        # np.save(f'{save_path}/processed_beatmap_chunk_final.npy', beatmap_array)
+
+        # input_data = [np.array(song) for song in processed_audio_list]
+        # output_data = [np.array(song) for song in processed_beatmap_list]
+
+        # # Create a TensorFlow dataset
+        # dataset = tf.data.Dataset.from_tensor_slices((input_data, output_data))
+        # dataset = dataset.batch(1)  # Batch size of 1 for demonstration
+
+        # # Custom filename and extension
+        # filename = f"processed_beatmap_chunk_final.npy"
+        # # extension = ".tfdata"  # Custom extension
+
+        # # # Define the save path (just the directory part)
+        # save_path = os.path.join(save_path, filename)
+
+        # # Ensure the directory exists
+        # if not os.path.exists(save_path):
+        #     os.makedirs(save_path)
+
+        # # Save the dataset
+        # tf.data.experimental.save(dataset, save_path)
+
+        # Generator function
+    
+        # Create dataset
+        dataset = create_dataset(processed_audio_list, processed_beatmap_list)
+
+        # Optionally, batch the dataset if needed
+        dataset = dataset.batch(1)
+
+        return dataset,itr
+
+    

@@ -29,7 +29,7 @@ def load_mfcc_data_from_npy_folder(folder_path):
 
 import numpy as np
 
-def create_chunks_from_mfcc(song_mfcc, chunk_size_ms=100, overlap_ms=50, sr=22050):
+def create_chunks_from_mfcc(song_mfcc , sr=22050):
     # """
     # Create overlapping chunks from MFCC data for a single song.
     
@@ -64,8 +64,8 @@ def create_chunks_from_mfcc(song_mfcc, chunk_size_ms=100, overlap_ms=50, sr=2205
     # MFCCs for 50ms = 560.3 * (50/1000) ≈ 28.02
 
 
-    chunk_size = 56.03 #for 100ms
-    overlap_size = 28.02 #for 50ms
+    chunk_size =  11.206 #for 20ms             #56.03 #for 100ms
+    overlap_size =  5.603 #for 10ms            #28.02 #for 50ms
     
     num_rows = song_mfcc.shape[0]  # number of time steps (since the data is transposed)
     # print(song_mfcc.shape)
@@ -82,7 +82,7 @@ def create_chunks_from_mfcc(song_mfcc, chunk_size_ms=100, overlap_ms=50, sr=2205
     return np.array(chunks)
 
 
-def create_overlapping_chunks(mfcc_data, chunk_size_ms=100, overlap_ms=50, sr=22050):
+def create_overlapping_chunks(mfcc_data, sr=22050):
     """
     Create overlapping chunks from MFCC data for each song in the list.
     
@@ -98,7 +98,7 @@ def create_overlapping_chunks(mfcc_data, chunk_size_ms=100, overlap_ms=50, sr=22
     songs = []
     
     for song_mfcc in mfcc_data:
-        chunks = create_chunks_from_mfcc(song_mfcc, chunk_size_ms, overlap_ms, sr)
+        chunks = create_chunks_from_mfcc(song_mfcc, sr)
         songs.append(chunks)
     
     return songs
