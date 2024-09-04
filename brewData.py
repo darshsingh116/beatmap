@@ -18,8 +18,8 @@ def brew():
     df = df[(df["mode"] == 0) & (df["difficultyrating"]>4.8) & (df["difficultyrating"]< 6) & (df["split"]=="train")]
     # df = df[df["audio"]=="0013ddfd8bd55fdccc0b253e313b7a60"]
     # df = df[df["audio"]=="21f85de72bd9ab9338b7f68252bf848f"]
-    df = df[0:1000]
-
+    # df=df[df["audio"]=="008b739aabdf6a7726dcbc1edde1e319"]
+    df = df[0:50]
     # Preprocess and store all audio data tobe trained
     
     preprocess_and_save_audio_in_parallel(df)

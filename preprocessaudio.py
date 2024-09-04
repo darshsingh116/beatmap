@@ -29,13 +29,15 @@ def preprocess_and_save_audio(df):
             continue
 
         # Define custom frame size and hop length
-        frame_size = 2048  # Frame size (n_fft)
-        hop_length = 512   # Hop length (number of samples between successive frames)
-
+        frame_size = 221  # Frame size (n_fft)
+        hop_length = 220  # Hop length (number of samples between successive frames)
+        #doing above will create 1mff per 10ms audio as sampling rate is 22000 and hop size is 220
+        
         # Compute MFCCs with the specified frame size and hop length
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=frame_size, hop_length=hop_length)
-        mfcc = np.array(mfcc)
         mfcc = np.transpose(mfcc)
+        print(len(mfcc))
+        print("~~~~")
         chunks = create_chunks_from_mfcc(mfcc)
         # Construct the save path
         save_path = os.path.join(processed_dir, f"{row['audio']}-a.npy")
@@ -51,21 +53,24 @@ def process_audio(row, processed_dir):
         file_path = os.path.join(archive_path, "train", row['folder'], "audio.opus")
         
         try:
-            y, sr = librosa.load(file_path, sr=22050)
+            y, sr = librosa.load(file_path, sr=22000)
         except FileNotFoundError:
             print(f"File {file_path} not found.")
             return
         
         # Define custom frame size and hop length
-        frame_size = 2048  # Frame size (n_fft)
-        hop_length = 512   # Hop length (number of samples between successive frames)
+        frame_size = 221  # Frame size (n_fft)
+        hop_length = 220  # Hop length (number of samples between successive frames)
+        #doing above will create 1mff per 10ms audio as sampling rate is 22000 and hop size is 220
         
         # Compute MFCCs with the specified frame size and hop length
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=frame_size, hop_length=hop_length)
         mfcc = np.transpose(mfcc)
+        print(len(mfcc))
+        print("~~~~")
         chunks = create_chunks_from_mfcc(mfcc)
 
-        
+
         # Construct the save path
         save_path = os.path.join(processed_dir, f"{row['audio']}-a.npy")
         

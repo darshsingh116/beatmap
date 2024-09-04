@@ -119,7 +119,8 @@ def process_audio_and_beatmap_for_model_single(metadata):
     except ValueError as e:
         print(f"Error loading files: {e}")
         return None, None
-
+    # for h in beatmap_data:
+    #     print(h)
     # Initialize the processed lists
     processed_audio = []
     processed_beatmap = []
@@ -134,14 +135,17 @@ def process_audio_and_beatmap_for_model_single(metadata):
         # fix_under_ten_ms = False
         if (beatmap_itr > 0) and beatmap_itr < len(beatmap_data):
             if beatmap_data[beatmap_itr][2] < beatmap_data[beatmap_itr-1][2]:
-                raise ValueError(f"PARSING ERROR SOMEWHERE : Beatmap timestamp {beatmap_data[beatmap_itr][2]}ms is smaller than previous which is{beatmap_data[beatmap_itr-1][2]} in map {metadata['folder']}/{metadata['audio']}.osu")
+                raise ValueError(f"PARSING ERROR SOMEWHERE : Beatmap timestamp {beatmap_data[beatmap_itr][2]}ms is smaller than previous which is {beatmap_data[beatmap_itr-1][2]} in map {metadata['folder']}/{metadata['audio']}.osu")
+        
         timestamp = i * 10  # Calculate the timestamp for this chunk in ms
-        if len(processed_beatmap) > 1:
-            if ((beatmap_data[beatmap_itr][2]- beatmap_data[beatmap_itr-1][2]) < 10) or (timestamp > beatmap_data[beatmap_itr][2]):
+        
+        if (len(processed_beatmap) > 1) and (beatmap_itr > 0) and (beatmap_itr < len(beatmap_data)):
+            if ((beatmap_data[beatmap_itr][2] - beatmap_data[beatmap_itr-1][2]) < 10) or (timestamp > beatmap_data[beatmap_itr][2]):
                 if np.array_equal(processed_beatmap[-2], np.zeros_like(beatmap_data[0])):
                     processed_beatmap[-2] = processed_beatmap[-1]
                     processed_beatmap[-1] = beatmap_data[beatmap_itr]
                     # fix_under_ten_ms = True
+                    # print(f"fixing under 10ms parts,beatmap_itr {beatmap_itr}, beatmap_data[beatmap_itr][2] {beatmap_data[beatmap_itr][2]} , beatmap_data[beatmap_itr-1][2] {beatmap_data[beatmap_itr-1][2]} ,  timestamp {timestamp}")
                     beatmap_itr += 1
                 else:
                     a = (beatmap_data[beatmap_itr][2]- beatmap_data[beatmap_itr-1][2]) < 10
@@ -159,23 +163,21 @@ def process_audio_and_beatmap_for_model_single(metadata):
         # Check for the timestamp of the current beatmap data
         if beatmap_itr < len(beatmap_data):
             beatmap_timestamp = beatmap_data[beatmap_itr][2]  # Assuming the timestamp is at index 3
-            
+
             # If the audio chunk's timestamp overtakes the next beatmap timestamp, raise an error
             if beatmap_timestamp < timestamp and len(beatmap_data) > (beatmap_itr+1):
-                # if processed_beatmap[-2] == np.zeros_like(beatmap_data[0]):
-                #     processed_beatmap[-2]
-                #     beatmap_chunk = beatmap_data[beatmap_itr]
-                #     beatmap_itr += 1
-                # else:
                 raise ValueError(f"Audio timestamp {timestamp}ms has overtaken beatmap timestamp {beatmap_timestamp}ms in map {metadata['folder']}/{metadata['audio']}.osu")
 
             # Find the corresponding beatmap data within the 10ms window
             elif timestamp <= beatmap_timestamp < (timestamp + 10):
                 beatmap_chunk = beatmap_data[beatmap_itr]
+                # print(f"in beatmap_itr += 1 , timestamp is {timestamp} and beatmap time stamp is {beatmap_timestamp}")
                 beatmap_itr += 1  # Move to the next beatmap entry
             else:
+                # print(f"adding chunk with zero audio timestamp is {timestamp} and beatmap time stamp is {beatmap_timestamp}")
                 beatmap_chunk = np.zeros_like(beatmap_data[0])  # Default to zeros if no match is found
         else:
+            # print("beatmap finished adding zeroes")
             beatmap_chunk = np.zeros_like(beatmap_data[0])
 
 
@@ -201,7 +203,7 @@ def create_dataset(processed_audio_list, processed_beatmap_list):
     dataset = tf.data.Dataset.from_generator(
         data_generator,
         output_signature=(
-            tf.TensorSpec(shape=[None, 155], dtype=tf.float32),  # Variable length sequence with feature dimension 155
+            tf.TensorSpec(shape=[None, 142], dtype=tf.float32),  # Variable length sequence with feature dimension 142
             tf.TensorSpec(shape=[None, 35], dtype=tf.float32)    # Variable length sequence with feature dimension 35
         )
     )
@@ -301,6 +303,6 @@ def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
         # Optionally, batch the dataset if needed
         dataset = dataset.batch(1)
 
-        return dataset,itr
+        return dataset,itr,processed_audio_list,processed_beatmap_list
 
     

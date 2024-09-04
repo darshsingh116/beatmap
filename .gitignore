@@ -166,3 +166,5 @@ cython_debug/
 /processed-metadata
 /aiOutput
 /model-processed-data
+
+.env
