@@ -186,30 +186,59 @@ def process_audio_and_beatmap_for_model_single(metadata):
 
     return np.array(processed_audio), np.array(processed_beatmap)
 
-def data_generator(processed_audio_list,processed_beatmap_list):
-        for audio, beatmap in zip(processed_audio_list, processed_beatmap_list):
-            yield (tf.convert_to_tensor(audio, dtype=tf.float32),
-                    tf.convert_to_tensor(beatmap, dtype=tf.float32))
 
+def create_dataset(processed_audio_list, processed_beatmap_list, hyper_params_list):
 
-def create_dataset(processed_audio_list, processed_beatmap_list):
     # Generator function defined inside create_dataset
     def data_generator():
-        for audio, beatmap in zip(processed_audio_list, processed_beatmap_list):
-            yield (tf.convert_to_tensor(audio, dtype=tf.float32),
-                    tf.convert_to_tensor(beatmap, dtype=tf.float32))
+        for audio, beatmap, params in zip(processed_audio_list, processed_beatmap_list, hyper_params_list):
+            yield (
+                tf.convert_to_tensor(audio, dtype=tf.float32),
+                tf.convert_to_tensor(beatmap, dtype=tf.float32),
+                tf.convert_to_tensor(params, dtype=tf.float32)  # Convert params to tensor (1D array)
+            )
 
     # Create TensorFlow dataset
     dataset = tf.data.Dataset.from_generator(
         data_generator,
         output_signature=(
-            tf.TensorSpec(shape=[None, 142], dtype=tf.float32),  # Variable length sequence with feature dimension 142
-            tf.TensorSpec(shape=[None, 35], dtype=tf.float32)    # Variable length sequence with feature dimension 35
+            tf.TensorSpec(shape=[60000, 14], dtype=tf.float32),  # Variable length sequence with feature dimension 142
+            tf.TensorSpec(shape=[60000, 4], dtype=tf.float32),   # Variable length sequence with feature dimension 13
+            tf.TensorSpec(shape=[11], dtype=tf.float32),       # 1D array of hyperparameters (params) with variable length
         )
     )
-    
 
     return dataset
+
+
+# def create_dataset(audio_features, beatmap_outputs, hyper_params):
+#     # Convert to RaggedTensor
+#     ragged_audio_features = tf.ragged.constant(audio_features)
+#     ragged_beatmap_outputs = tf.ragged.constant(beatmap_outputs)
+
+#     # Create dataset with RaggedTensor
+#     dataset = tf.data.Dataset.from_tensor_slices((ragged_audio_features, ragged_beatmap_outputs, hyper_params))
+#     return dataset
+
+def padding_and_masking(data, dim,max_length):
+    """Pad information to a fixed length."""
+    # print(data.shape)
+    # Create an array of 1s with shape (100, 1)
+    extra_column = np.ones((len(data), 1))
+
+    # Concatenate the extra_column to the original data array along the last axis
+    expanded_data = np.concatenate((data, extra_column), axis=1)
+
+    # print(expanded_data.shape)
+    # Create a single array of zeros with dimension 13
+    single_array = np.zeros((dim+1))
+
+    # Create a list of 100 such arrays
+    padded_list = np.array([single_array for _ in range((max_length-len(data)))])
+    # print(padded_list.shape)
+    padded_hitobjects = np.concatenate((expanded_data, padded_list), axis=0)
+
+    return padded_hitobjects
 
 def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
     # Initialize empty arrays to store processed data
@@ -223,7 +252,6 @@ def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
     # Iterate through the DataFrame
     for index, row in df.iterrows():
         processed_audio, processed_beatmap = process_audio_and_beatmap_for_model_single(row)
-
         # Append the processed data to lists
         processed_audio_list.append(processed_audio)
         processed_beatmap_list.append(processed_beatmap)
@@ -306,3 +334,173 @@ def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
         return dataset,itr,processed_audio_list,processed_beatmap_list
 
     
+
+    
+
+
+
+
+def new_process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
+    # Initialize empty arrays to store processed data
+    processed_audio_list = []
+    processed_beatmap_list = []
+    hyper_params_list = []
+
+    save_path = os.path.join(project_path,"model-processed-data")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    itr=0
+    # Iterate through the DataFrame
+    for index, row in df.iterrows():
+        try:
+            processed_audio, processed_beatmap,params  = new_process_audio_and_beatmap_for_model_single(row)
+            
+            processed_audio = padding_and_masking(processed_audio,13,60000)
+            processed_beatmap = padding_and_masking(processed_beatmap,3,60000)
+            # Append the processed data to lists
+            processed_audio_list.append(processed_audio)
+            processed_beatmap_list.append(processed_beatmap)
+            hyper_params_list.append(params)
+
+            # Save periodically to avoid memory overflow
+            if (itr + 1) % chunk_size == 0:
+                
+                # # Convert lists to numpy arrays
+                # audio_array = np.array(processed_audio_list)
+                # beatmap_array = np.array(processed_beatmap_list)
+
+                # # Save to disk
+                # np.save(f'{save_path}/processed_audio_chunk_{itr//chunk_size}.npy', audio_array)
+                # np.save(f'{save_path}/processed_beatmap_chunk_{itr//chunk_size}.npy', beatmap_array)
+                # Example data
+
+                input_data = [np.array(song) for song in processed_audio_list]
+                output_data = [np.array(song) for song in processed_beatmap_list]
+                hyper_params = [np.array(song) for song in hyper_params_list] 
+                # Create a TensorFlow dataset
+                dataset = tf.data.Dataset.from_tensor_slices((input_data, output_data, hyper_params))
+                dataset = dataset.batch(1)  # Batch size of 1 for demonstration
+
+                # Custom filename and extension
+                filename = f"processed_dataset_{itr//chunk_size}"
+                # extension = ".tfdata"  # Custom extension
+
+                # # Define the save path (just the directory part)
+                save_path = os.path.join(save_path, filename)
+
+                # Ensure the directory exists
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+
+                # Save the dataset
+                tf.data.experimental.save(dataset, save_path)
+
+                # Clear lists to free up memory
+                processed_audio_list = []
+                processed_beatmap_list = []
+                hyper_params_list = []
+
+            itr+=1
+        except Exception as e :
+            print(e)
+            print("Nan or not float found in params")
+    # Save remaining data
+    if processed_audio_list and processed_beatmap_list:
+        
+        # audio_array = np.array(processed_audio_list)
+        # beatmap_array = np.array(processed_beatmap_list)
+        # np.save(f'{save_path}/processed_audio_chunk_final.npy', audio_array)
+        # np.save(f'{save_path}/processed_beatmap_chunk_final.npy', beatmap_array)
+
+        # input_data = [np.array(song) for song in processed_audio_list]
+        # output_data = [np.array(song) for song in processed_beatmap_list]
+
+        # # Create a TensorFlow dataset
+        # dataset = tf.data.Dataset.from_tensor_slices((input_data, output_data))
+        # dataset = dataset.batch(1)  # Batch size of 1 for demonstration
+
+        # # Custom filename and extension
+        # filename = f"processed_beatmap_chunk_final.npy"
+        # # extension = ".tfdata"  # Custom extension
+
+        # # # Define the save path (just the directory part)
+        # save_path = os.path.join(save_path, filename)
+
+        # # Ensure the directory exists
+        # if not os.path.exists(save_path):
+        #     os.makedirs(save_path)
+
+        # # Save the dataset
+        # tf.data.experimental.save(dataset, save_path)
+
+        # Generator function
+    
+        # Create dataset
+        dataset = create_dataset(processed_audio_list, processed_beatmap_list,hyper_params_list)
+
+        # Optionally, batch the dataset if needed
+        # dataset = dataset.batch(1)
+
+        return dataset,itr,processed_audio_list,processed_beatmap_list,hyper_params_list
+
+
+
+
+def new_process_audio_and_beatmap_for_model_single(metadata):
+    # Define paths to the beatmap and audio files
+    beatmap_path = os.path.join(project_path, "processed-beatmaps", f"{metadata['audio']}-b.npy")
+    audio_path = os.path.join(project_path, "processed-audio", f"{metadata['audio']}-a.npy")
+
+    # Load beatmap and audio data if files exist
+    if not os.path.exists(beatmap_path):
+        print(f"Beatmap file not found: {beatmap_path}")
+        return None, None, None
+
+    if not os.path.exists(audio_path):
+        print(f"Audio file not found: {audio_path}")
+        return None, None, None
+
+    try:
+        beatmap_data = np.load(beatmap_path, allow_pickle=True)
+        audio_data = np.load(audio_path, allow_pickle=True)
+    except ValueError as e:
+        print(f"Error loading files: {e}")
+        return None, None, None
+ 
+    processed_beatmap = []
+    params = [float(metadata["bpm"]),float(metadata["total_length"])]+[float(x) for x in metadata[-9:]]
+    params = np.array(params)
+    for p in params:
+        if isinstance(p, float) and not np.isnan(p):
+            # p is a valid float and not NaN
+            pass
+        else:
+            raise ValueError("Nan or not float found in params in single func")
+        
+
+    previousIsSlider = 2
+    current = [] #timestamp , duration, type
+    prevTime = 0
+    for h in beatmap_data:
+        hit_type = int(h[3])
+        # Convert hit_type to a binary string
+        binary_representation = bin(hit_type)[-4:]
+        # Check the last three bits
+        last_three_bits = binary_representation.zfill(3)  # Ensure it's always 3 bits long
+        # Find indices of '1' bits
+        indices_of_ones = [i for i, bit in enumerate(reversed(last_three_bits)) if bit == '1']
+
+        # time end is 18 , slider end is 17th
+        if 1 in indices_of_ones:
+            if h[17] == 2:
+                current[1] = h[18]-prevTime
+                processed_beatmap.append(current)
+            elif h[17] == 0:
+                prevTime = h[2]
+                current = [h[2],0,h[3]]
+                continue               
+        else:
+            current = [h[2],(h[18]-h[2]),h[3]]
+            processed_beatmap.append(current)
+
+    return np.array(audio_data), np.array(processed_beatmap),params
