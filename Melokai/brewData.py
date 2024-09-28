@@ -15,11 +15,11 @@ def brew():
     df = df[(df["mode"] == 0) & (df["difficultyrating"]>4.8) & (df["difficultyrating"]< 6) & (df["split"]=="train") & (df['total_length'] < 600)]
     # df = df[df["audio"]=="0013ddfd8bd55fdccc0b253e313b7a60"]
 
-    df = df[0:2]
+    df = df[0:1500]
     # Preprocess and store all audio data tobe trained
     
-    #preprocess_and_save_audio_in_parallel(df)
-    preprocess_and_save_audio(df)
+    # preprocess_and_save_audio_in_parallel(df)
+    # preprocess_and_save_audio(df)
 
     #  # End the timer (Toc)
     # toc = time.time()
@@ -32,7 +32,7 @@ def brew():
     # tic = time.time()
 
     # Cook the .osu data
-    load_osu_files_from_df(df)
+    load_osu_files_from_df(df)    #uncomment this
 
     #we are saving metadata inside load_osu_siles_from_df func as we are modifying df with addition of hyperparams and then saving
 

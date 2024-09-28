@@ -342,7 +342,8 @@ def process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
 
 def new_process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
     # Initialize empty arrays to store processed data
-    processed_audio_list = []
+    input_audio_list = []
+    output_beatmap_list = []
     processed_beatmap_list = []
     hyper_params_list = []
 
@@ -353,9 +354,10 @@ def new_process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
     # Iterate through the DataFrame
     for index, row in df.iterrows():
         try:
-            processed_audio, processed_beatmap,params  = new_process_audio_and_beatmap_for_model_single(row)
+            input_audio,output_beatmap, processed_beatmap,params  = new_process_audio_and_beatmap_for_model_single(row)
             # Append the processed data to lists
-            processed_audio_list.append(processed_audio)
+            input_audio_list.append(input_audio)
+            output_beatmap_list.append(output_beatmap)
             processed_beatmap_list.append(processed_beatmap)
             hyper_params_list.append(params)
 
@@ -371,7 +373,7 @@ def new_process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
                 # np.save(f'{save_path}/processed_beatmap_chunk_{itr//chunk_size}.npy', beatmap_array)
                 # Example data
 
-                input_data = [np.array(song) for song in processed_audio_list]
+                input_data = [np.array(song) for song in input_audio_list]
                 output_data = [np.array(song) for song in processed_beatmap_list]
                 hyper_params = [np.array(song) for song in hyper_params_list] 
                 # Create a TensorFlow dataset
@@ -393,7 +395,7 @@ def new_process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
                 tf.data.experimental.save(dataset, save_path)
 
                 # Clear lists to free up memory
-                processed_audio_list = []
+                input_audio_list = []
                 processed_beatmap_list = []
                 hyper_params_list = []
 
@@ -402,7 +404,7 @@ def new_process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
             print(e)
             print("Nan or not float found in params")
     # Save remaining data
-    if processed_audio_list and processed_beatmap_list:
+    if input_audio_list and processed_beatmap_list:
         
         # audio_array = np.array(processed_audio_list)
         # beatmap_array = np.array(processed_beatmap_list)
@@ -438,7 +440,7 @@ def new_process_audio_and_beatmap_for_model_all_and_save(df,chunk_size=2000):
         # Optionally, batch the dataset if needed
         # dataset = dataset.batch(1)
 
-        return itr,processed_audio_list,processed_beatmap_list,hyper_params_list
+        return itr,input_audio_list,output_beatmap_list,processed_beatmap_list,hyper_params_list
 
 
 
@@ -486,9 +488,9 @@ def new_process_audio_and_beatmap_for_model_single(metadata):
     for a in audio_data:
         if h_ptr<len(beatmap_data):
             hitobj = beatmap_data[h_ptr]
-            print("diff for a[0]="+str(a[0])+" and hitobj[2] "+ str(hitobj[2])+" is "+str(abs(int(hitobj[2]-a[0]))))
+            # print("diff for a[0]="+str(a[0])+" and hitobj[2] "+ str(hitobj[2])+" is "+str(abs(int(hitobj[2]-a[0]))))
             if (hitobj[2] == a[0]) or (a[0]-hitobj[2] > 0):
-                print(a[0])
+                # print(a[0])
                 hit_type = int(hitobj[3])
                 # Convert hit_type to a binary string
                 binary_representation = bin(hit_type)[-4:]
@@ -520,7 +522,7 @@ def new_process_audio_and_beatmap_for_model_single(metadata):
 
             else:
                 if prevIsSpinnerOrSliderEndTimestamp == -1:
-                    print("this1 for " + str(a[0]))
+                    # print("this1 for " + str(a[0]))
                     processed_beatmap.append([a[0],0,0])
                 else:
                     if ((a[0] <= prevIsSpinnerOrSliderEndTimestamp) or (abs(a[0] - prevIsSpinnerOrSliderEndTimestamp)<10)):
@@ -544,13 +546,13 @@ def new_process_audio_and_beatmap_for_model_single(metadata):
                             else:
                                 processed_beatmap.append([a[0],hit_type,1])
                     else:
-                        print("this2")
+                        # print("this2")
                         processed_beatmap.append([a[0],0,0])
                         prevIsSpinnerOrSliderEndTimestamp = -1
 
 
         else:
-            print("this3")
+            # print("this3")
             processed_beatmap.append([a[0],0,0])
             
 
@@ -582,4 +584,12 @@ def new_process_audio_and_beatmap_for_model_single(metadata):
     #         current = [h[2],(h[18]-h[2]),h[3]]
     #         processed_beatmap.append(current)
 
-    return np.array(audio_data), np.array(processed_beatmap),params
+    input_audio = []
+    output_beatmap = []
+    for a in audio_data:
+        input_audio.append(a[1])
+    
+    for b in processed_beatmap:
+        output_beatmap.append(b[1:])
+
+    return np.array(input_audio), np.array(output_beatmap),np.array(processed_beatmap),params

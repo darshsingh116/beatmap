@@ -2,12 +2,15 @@ import os
 import librosa
 import numpy as np
 from .audio import *
-from joblib import Parallel, delayed
+import dask.dataframe as dd
+from dask import delayed
+import dask
 from dotenv import load_dotenv
 load_dotenv()
 archive_path = os.getenv('ARCHIVE_PATH')
 module_path = os.getenv('MODULE_PATH')
 
+import ray
 
 
 def preprocess_and_save_audio(df):
@@ -45,9 +48,9 @@ def preprocess_and_save_audio(df):
             
 
         beatlen = float(tp[1])
-        first_beat_time=int(tp[0])
-        if int(tp[0])<(beatlen/8):
-            first_beat_time=beatlen+int(tp[0])
+        first_beat_time = int(float(tp[0]))
+        if int(float(tp[0]))<(beatlen/8):
+            first_beat_time=beatlen+int(float(tp[0]))
 
         # Construct the file path from the folder and audio fields
         file_path = os.path.join(archive_path,"train", row['folder'], "audio.opus")
@@ -94,7 +97,7 @@ def preprocess_and_save_audio(df):
 
                 # Compute MFCCs for this chunk
                 # mfcc = librosa.feature.mfcc(y=audio_chunk, sr=sr, n_mfcc=13, n_fft=(chunk_end-chunk_start), hop_length=(chunk_end-chunk_start), n_mels=40)
-                mfcc = librosa.feature.mfcc(y=audio_chunk, sr=sr, n_mfcc=13, n_mels=40)
+                mfcc = librosa.feature.mfcc(y=audio_chunk,n_fft=(chunk_end-chunk_start), sr=sr, n_mfcc=13, n_mels=40)
                 mfcc = np.mean(mfcc, axis=1) 
                 # # Compute Chroma features for this chunk
                 # chroma = librosa.feature.chroma_cqt(y=audio_chunk, sr=sr, hop_length=0, n_chroma=12)
@@ -153,57 +156,123 @@ def preprocess_and_save_audio(df):
         # print(f"Saved: {save_path}")
 
 
-
+@ray.remote
 def process_audio(row, processed_dir):
     try:
-        file_path = os.path.join(archive_path, "train", row['folder'], "audio.opus")
+        tp=[]
+        file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
+        with open(file_path, 'r', encoding='utf-8') as file: 
+            current_section = None
+            # inherit data
+            for line in file:
+                line = line.strip()
+                if line.startswith('['):
+                    # Handle section headers
+                    current_section = line[1:-1]
+                    continue
+                
+                if current_section == 'HitObjects' and line:
+                    continue
+                
+                if current_section == 'TimingPoints' and line:
+                    if(line == ""):
+                        continue
+                    tp = line.split(',')
+                    break
+
+                if ':' in line:
+                    continue
+            
+
+        beatlen = float(tp[1])
+        first_beat_time = int(float(tp[0]))
+        if int(float(tp[0]))<(beatlen/8):
+            first_beat_time=beatlen+int(float(tp[0]))
+
+        # Construct the file path from the folder and audio fields
+        file_path = os.path.join(archive_path,"train", row['folder'], "audio.opus")
         
+        # Load the audio file
         try:
             y, sr = librosa.load(file_path, sr=22000)
+            # Calculate the chunk duration in samples
+            sr=22000
+            chunk_duration_samples = int((beatlen * sr)/(4000))  # beatlen is in ms, sr is in samples per second
+
+            # List to hold extracted features
+            features = []
+            audio_length_ms = (len(y) / sr) * 1000
+            n_chunks = int((audio_length_ms - first_beat_time)/(beatlen/4))
+            # Loop through chunks
+            for i in range((n_chunks-1)):
+                # Calculate the start and end of the current chunk
+                chunk_midpoint_time = first_beat_time + i * (beatlen/4)  # Midpoint of the chunk in ms
+                chunk_midpoint_sample = int(chunk_midpoint_time * sr / 1000)  # Convert time to sample index
+                chunk_start = int(max(0, chunk_midpoint_sample - (chunk_duration_samples // 2)))
+                chunk_end = int(min(len(y), chunk_midpoint_sample + (chunk_duration_samples // 2)))
+
+                # Slice the audio for this chunk
+                audio_chunk = y[chunk_start:chunk_end]
+                size = abs(int((chunk_end-chunk_start)))
+                # Compute MFCCs for this chunk
+                # mfcc = librosa.feature.mfcc(y=audio_chunk, sr=sr, n_mfcc=13, n_fft=(chunk_end-chunk_start), hop_length=(chunk_end-chunk_start), n_mels=40)
+                mfcc = librosa.feature.mfcc(y=audio_chunk,n_fft=size, sr=sr, n_mfcc=13,n_mels=40)
+                mfcc = np.mean(mfcc, axis=1) 
+
+                features.append([int(chunk_midpoint_time),mfcc])
         except FileNotFoundError:
             print(f"File {file_path} not found.")
-            return
-        
-        # Define custom frame size and hop length
-        frame_size = 221  # Frame size (n_fft)
-        hop_length = 220  # Hop length (number of samples between successive frames)
-        #doing above will create 1mffc per 10ms audio as sampling rate is 22000 and hop size is 220
-        
-        # Compute MFCCs with the specified frame size and hop length
-        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=frame_size, hop_length=hop_length,n_mels=40)
-        # Extract Chroma features
-        # chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length, n_chroma=12)
-  
-        # combined_features = np.concatenate((mfcc, chroma), axis=0)
-        # combined_features = np.transpose(combined_features)
-        mfcc = np.transpose(mfcc)
-        # Convert to float32 to save memory
-        # combined_features = combined_features.astype(np.float32)
-        combined_features = mfcc.astype(np.float32)
-        
-        # chunks = create_chunks_from_mfcc(mfcc)
+    except FileNotFoundError:
+            print(f"File {file_path} not found.")
+
+    # Construct the save path
+    save_path = os.path.join(processed_dir, f"{row['audio']}-a.npy")
+    
+    # Save the MFCC features as a .npy file
+    features = np.array(features)
+    np.save(save_path, features)
+
+from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
+from functools import partial
+
+# def process_audio_batch(rows):
+#     processed_dir = os.path.join(os.getcwd(), 'processed-audio')
+#     for row in rows:
+#         index, row_data = row  # Unpack the tuple
+#         process_audio(row_data,processed_dir)
+#         pass
+
+# def preprocess_and_save_audio_in_parallel(df):
+#     processed_dir = os.path.join(os.getcwd(), 'processed-audio')
+#     os.makedirs(processed_dir, exist_ok=True)
+
+#     # Convert the DataFrame to a list of rows
+#     tasks = list(df.iterrows())
+
+#     batch_size = max(1, len(tasks) // 8)  # Adjust the batch size based on the number of cores
+
+#     # Create batches of tasks
+#     batches = [tasks[i:i + batch_size] for i in range(0, len(tasks), batch_size)]
+
+#     # Use Pool to parallelize the processing
+#     with Pool(8) as pool:
+#         # Use map to wrap the iterable and process batches
+#         pool.map(process_audio_batch, batches)
 
 
-        # Construct the save path
-        save_path = os.path.join(processed_dir, f"{row['audio']}-a.npy")
-        
-        # Save the MFCC features as a .npy file
-        np.save(save_path, combined_features)
-        # print(f"Saved: {save_path}")
-    except:
-        print("error")
+
 
 def preprocess_and_save_audio_in_parallel(df):
+    ray.init()
     # Directory where processed files will be saved
     processed_dir = os.path.join(os.getcwd(), 'processed-audio')
     
     # Check if the directory exists, if not, create it
     os.makedirs(processed_dir, exist_ok=True)
     
-    # Use joblib's Parallel and delayed to parallelize the processing
-    Parallel(n_jobs=3)(delayed(process_audio)(row, processed_dir) for index, row in df.iterrows())
-
-
+    
+    processed_df = ray.get([process_audio.remote(row, processed_dir) for index, row in df.iterrows()])
 
 
 

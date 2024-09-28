@@ -599,8 +599,9 @@ progress_counter = 0
 def process_file(index, row):
     try:
         file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
+        audio_file_path = os.path.join("processed-audio", f"{row['audio']}-a.npy")
         
-        if os.path.exists(file_path):
+        if os.path.exists(file_path) and os.path.exists(audio_file_path):
             # Parse the osu! file
             data, hyperParamFooter = parse_osu_file(file_path)
             
