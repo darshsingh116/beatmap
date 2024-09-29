@@ -15,10 +15,10 @@ def brew():
     df = df[(df["mode"] == 0) & (df["difficultyrating"]>4.8) & (df["difficultyrating"]< 6) & (df["split"]=="train") & (df['total_length'] < 600)]
     # df = df[df["audio"]=="0013ddfd8bd55fdccc0b253e313b7a60"]
 
-    df = df[0:1500]
+    df = df[0:30]
     # Preprocess and store all audio data tobe trained
     
-    # preprocess_and_save_audio_in_parallel(df)
+    preprocess_and_save_audio_in_parallel(df)
     # preprocess_and_save_audio(df)
 
     #  # End the timer (Toc)

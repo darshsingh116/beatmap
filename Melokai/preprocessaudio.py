@@ -2,15 +2,14 @@ import os
 import librosa
 import numpy as np
 from .audio import *
-import dask.dataframe as dd
-from dask import delayed
-import dask
 from dotenv import load_dotenv
+from sklearn.preprocessing import MinMaxScaler
+from joblib import Parallel, delayed
 load_dotenv()
 archive_path = os.getenv('ARCHIVE_PATH')
 module_path = os.getenv('MODULE_PATH')
 
-import ray
+# import ray
 
 
 def preprocess_and_save_audio(df):
@@ -81,7 +80,9 @@ def preprocess_and_save_audio(df):
             chunk_duration_samples = int((beatlen * sr)/(4000))  # beatlen is in ms, sr is in samples per second
 
             # List to hold extracted features
-            features = []
+            
+            mfcc_array = []
+            chunk_midpoint_time_array = []
             audio_length_ms = (len(y) / sr) * 1000
             n_chunks = int((audio_length_ms - first_beat_time)/(beatlen/4))
             # Loop through chunks
@@ -94,11 +95,18 @@ def preprocess_and_save_audio(df):
 
                 # Slice the audio for this chunk
                 audio_chunk = y[chunk_start:chunk_end]
+                chunk_length = audio_chunk.shape[0]
+
 
                 # Compute MFCCs for this chunk
                 # mfcc = librosa.feature.mfcc(y=audio_chunk, sr=sr, n_mfcc=13, n_fft=(chunk_end-chunk_start), hop_length=(chunk_end-chunk_start), n_mels=40)
-                mfcc = librosa.feature.mfcc(y=audio_chunk,n_fft=(chunk_end-chunk_start), sr=sr, n_mfcc=13, n_mels=40)
-                mfcc = np.mean(mfcc, axis=1) 
+                mfcc = librosa.feature.mfcc(y=audio_chunk,n_fft=chunk_length, hop_length=chunk_length, sr=sr, n_mfcc=80, n_mels=128)
+                mfcc = np.mean(mfcc, axis=1)
+                # show_data(data)
+                
+                mfcc = np.array(mfcc)
+                mfcc = np.transpose(mfcc)
+                # print('mfcc shape ', mfcc.shape)
                 # # Compute Chroma features for this chunk
                 # chroma = librosa.feature.chroma_cqt(y=audio_chunk, sr=sr, hop_length=0, n_chroma=12)
 
@@ -110,7 +118,10 @@ def preprocess_and_save_audio(df):
 
                 # # Append to the features list
                 # features.append(combined_features)
-                features.append([int(chunk_midpoint_time),mfcc])
+                mfcc_array.append(mfcc)
+                chunk_midpoint_time_array.append(chunk_midpoint_time)
+                
+                
         except FileNotFoundError:
             print(f"File {file_path} not found.")
             continue
@@ -143,12 +154,22 @@ def preprocess_and_save_audio(df):
         # # print("~~~~")
         # # chunks = create_chunks_from_mfcc(mfcc)
 
+        features = []
+
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaler = scaler.fit(mfcc_array)
+        mfcc_array = scaler.transform(mfcc_array)
+        print(mfcc_array.shape)
+        for chunk_midpoint_time, mfcc in zip(chunk_midpoint_time_array, mfcc_array):
+            new_entry = (int(chunk_midpoint_time), mfcc)
+            features.append(new_entry)
 
         # Construct the save path
         save_path = os.path.join(processed_dir, f"{row['audio']}-a.npy")
         
         # Save the MFCC features as a .npy file
-        features = np.array(features)
+        # features = np.array(features)
+        features = np.array(features, dtype=object)
         # print(features.shape)
         # for f in features:
         #     print(f)
@@ -156,8 +177,11 @@ def preprocess_and_save_audio(df):
         # print(f"Saved: {save_path}")
 
 
-@ray.remote
+# @ray.remote
 def process_audio(row, processed_dir):
+    # List to hold extracted features
+    mfcc_array = []
+    chunk_midpoint_time_array = []
     try:
         tp=[]
         file_path = os.path.join(archive_path, "train", row['folder'], f"{row['audio']}.osu")
@@ -199,8 +223,7 @@ def process_audio(row, processed_dir):
             sr=22000
             chunk_duration_samples = int((beatlen * sr)/(4000))  # beatlen is in ms, sr is in samples per second
 
-            # List to hold extracted features
-            features = []
+            
             audio_length_ms = (len(y) / sr) * 1000
             n_chunks = int((audio_length_ms - first_beat_time)/(beatlen/4))
             # Loop through chunks
@@ -213,24 +236,56 @@ def process_audio(row, processed_dir):
 
                 # Slice the audio for this chunk
                 audio_chunk = y[chunk_start:chunk_end]
-                size = abs(int((chunk_end-chunk_start)))
+                chunk_length = audio_chunk.shape[0]
+
+
                 # Compute MFCCs for this chunk
                 # mfcc = librosa.feature.mfcc(y=audio_chunk, sr=sr, n_mfcc=13, n_fft=(chunk_end-chunk_start), hop_length=(chunk_end-chunk_start), n_mels=40)
-                mfcc = librosa.feature.mfcc(y=audio_chunk,n_fft=size, sr=sr, n_mfcc=13,n_mels=40)
-                mfcc = np.mean(mfcc, axis=1) 
+                mfcc = librosa.feature.mfcc(y=audio_chunk,n_fft=chunk_length, hop_length=chunk_length, sr=sr, n_mfcc=80, n_mels=128)
+                mfcc = np.mean(mfcc, axis=1)
+                # show_data(data)
+                
+                mfcc = np.array(mfcc)
+                mfcc = np.transpose(mfcc)
+                # print('mfcc shape ', mfcc.shape)
+                # # Compute Chroma features for this chunk
+                # chroma = librosa.feature.chroma_cqt(y=audio_chunk, sr=sr, hop_length=0, n_chroma=12)
 
-                features.append([int(chunk_midpoint_time),mfcc])
+                # # Combine MFCC and Chroma features
+                # combined_features = np.concatenate((mfcc, chroma), axis=0)
+
+                # # Transpose to have time frames as rows
+                # combined_features = np.transpose(combined_features)
+
+                # # Append to the features list
+                # features.append(combined_features)
+                mfcc_array.append(mfcc)
+                chunk_midpoint_time_array.append(chunk_midpoint_time)
         except FileNotFoundError:
             print(f"File {file_path} not found.")
     except FileNotFoundError:
             print(f"File {file_path} not found.")
 
+    features = []
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaler = scaler.fit(mfcc_array)
+    mfcc_array = scaler.transform(mfcc_array)
+    print(mfcc_array.shape)
+    for chunk_midpoint_time, mfcc in zip(chunk_midpoint_time_array, mfcc_array):
+        new_entry = (int(chunk_midpoint_time), mfcc)
+        features.append(new_entry)
+
     # Construct the save path
     save_path = os.path.join(processed_dir, f"{row['audio']}-a.npy")
     
     # Save the MFCC features as a .npy file
-    features = np.array(features)
+    # features = np.array(features)
+    features = np.array(features, dtype=object)
+    # print(features.shape)
+    # for f in features:
+    #     print(f)
     np.save(save_path, features)
+    # print(f"Saved: {save_path}")
 
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
@@ -263,18 +318,26 @@ from functools import partial
 
 
 
+# def preprocess_and_save_audio_in_parallel(df):
+#     # ray.init()
+#     # Directory where processed files will be saved
+#     processed_dir = os.path.join(os.getcwd(), 'processed-audio')
+    
+#     # Check if the directory exists, if not, create it
+#     os.makedirs(processed_dir, exist_ok=True)
+    
+    
+#     processed_df = ray.get([process_audio.remote(row, processed_dir) for index, row in df.iterrows()])
+
 def preprocess_and_save_audio_in_parallel(df):
-    ray.init()
     # Directory where processed files will be saved
     processed_dir = os.path.join(os.getcwd(), 'processed-audio')
     
     # Check if the directory exists, if not, create it
     os.makedirs(processed_dir, exist_ok=True)
     
-    
-    processed_df = ray.get([process_audio.remote(row, processed_dir) for index, row in df.iterrows()])
-
-
+    # Use joblib's Parallel and delayed to parallelize the processing
+    Parallel(n_jobs=-1)(delayed(process_audio)(row, processed_dir) for index, row in df.iterrows())
 
 
 # Example usage with your DataFrame
