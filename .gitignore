@@ -161,10 +161,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-/processed-audio
-/processed-beatmaps
-/processed-metadata
+# /processed-audio
+# /processed-beatmaps
+# /processed-metadata
 /aiOutput
 /model-processed-data
 
-.env
+# .env
